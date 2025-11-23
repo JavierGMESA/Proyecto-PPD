@@ -24,8 +24,12 @@ int rand_int(int min, int max) {
     return min + rand() % (max - min + 1);
 }
 
-float rand_float() {
-    return (float) rand() / RAND_MAX;
+int rand_int_r(int min, int max, unsigned *semilla) {
+    return min + rand_r(semilla) % (max - min + 1);
+}
+
+float rand_float(unsigned *semilla) {
+    return (float) rand_r(semilla) / RAND_MAX;
 }
 
 // Evaluar OneMax
@@ -52,9 +56,9 @@ void copiar(Individuo *dest, const Individuo *src)
 }
 
 // Crossover de 1 punto
-void crossover_1p(const Individuo *p1, const Individuo *p2, Individuo *hijo) 
+void crossover_1p(const Individuo *p1, const Individuo *p2, Individuo *hijo, unsigned *semilla) 
 {
-    int punto = rand_int(1, L - 1);
+    int punto = rand_int_r(1, L - 1, semilla);
     for (int i = 0; i < L; i++) 
     {
         hijo->genes[i] = (i < punto) ? p1->genes[i] : p2->genes[i];
@@ -62,11 +66,11 @@ void crossover_1p(const Individuo *p1, const Individuo *p2, Individuo *hijo)
 }
 
 // Mutación (10% de probabilidad de invertir un bit al azar)
-short mutar(Individuo *ind) 
+short mutar(Individuo *ind, unsigned *semilla) 
 {
-    if (rand_float() < MUT_PROB) 
+    if (rand_float(semilla) < MUT_PROB) 
     {
-        int pos = rand_int(0, L - 1);
+        int pos = rand_int_r(0, L - 1, semilla);
         ind->genes[pos] = 1 - ind->genes[pos];
         return 1;
     }
@@ -77,7 +81,7 @@ short mutar(Individuo *ind)
 }
 
 // Obtener índice de vecino (von Neumann)
-void vecino_aleatorios(int fila, int col, int *fc) {
+void vecino_aleatorios(int fila, int col, int *fc, unsigned *semilla) {
     // fc[0], fc[1] -> primer vecino
     // fc[2], fc[3] -> segundo vecino
 
@@ -88,7 +92,7 @@ void vecino_aleatorios(int fila, int col, int *fc) {
     for (int k = 0; k < 2; k++) {
         int nf, nc;
         do {
-            int dir = rand() % 4;
+            int dir = rand_r(semilla) % 4;
             nf = fila + df[dir];
             nc = col + dc[dir];
         } while (nf < 0 || nf >= N_ROWS || nc < 0 || nc >= N_COLS);
@@ -180,16 +184,16 @@ int main(int argc, char *argv[]) {
     //Individuo poblacion[N_ROWS][N_COLS];
     //Individuo nueva_poblacion[N_ROWS][N_COLS];
     Individuo **poblacion, **nueva_poblacion;
+    Individuo *p1, *p2;
     poblacion = (Individuo**) calloc(N_ROWS, sizeof(Individuo*));
     nueva_poblacion = (Individuo**) calloc(N_ROWS, sizeof(Individuo*));
-    // Buffer intermedio para guardar hijos antes de decidir reemplazo
-    Individuo **hijos_temp = (Individuo**) calloc(N_ROWS, sizeof(Individuo*));
     if(!poblacion || !nueva_poblacion)
     {
         printf("Ha habido error en la reserva de memoria");
         return 1;
     }
-    int i;
+    int i, j;
+    int fc[4];
     for(i = 0; i < N_ROWS; ++i)
     {
         poblacion[i] = (Individuo*) calloc (N_COLS, sizeof(Individuo));
@@ -201,7 +205,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    Individuo mejor_individuo;
+    Individuo hijo, mejor_individuo;
     int mejor_fitness_global = 0;
     float v, u;
     float a = IniA, b = IniB, c = IniC, d = IniD, I = IniI;
@@ -222,127 +226,131 @@ int main(int argc, char *argv[]) {
                 mejor_fitness_global = evaluar(&poblacion[i][j]);
             }
         }
+
+    unsigned seed_array[128];
+    #pragma omp parallel
+    {
+        int tid = omp_get_thread_num();
+        seed_array[tid] = rand();   // semillas bien separadas
+    }
             
 
     // Bucle principal
     for (int gen = 0; gen < GEN_MAX; gen++) 
     {
         total_picos = 0;
-        float delta_I = 0, delta_b = 0, delta_c = 0, delta_d = 0;
-        //En paralelo hacemos el cálculo de los hijos y los cambios que se producirían en las variables, haciendo la suma de todos los cambios
-        #pragma omp parallel for reduction(+:delta_I, delta_b, delta_c, delta_d)
+        #pragma omp parallel for shared(a, poblacion, nueva_poblacion, mejor_fitness_global,) private(i, j, fc, p1, p2, hijo) lastprivate(b, c, d, I, v, u, picos_seguidos, ultimo_pico) default(shared)
         for (i = 0; i < N_ROWS; i++) 
         {
-            for (int j = 0; j < N_COLS; j++) 
-            {
+            for (j = 0; j < N_COLS; j++) 
+            {   
+                // CREAR SEMILLA LOCAL PARA rand_r (Crucial para que funcione en paralelo)
+                // Combinamos tiempo, coordenadas e ID del hilo para que sea única
+                int tid = omp_get_thread_num();
+                unsigned* semilla;
+                semilla = &seed_array[tid];   // cada hilo su propia semilla
 
                 // Selección de dos padres vecinos
-                int fc[4];
-                vecino_aleatorios(i, j, fc);
-                Individuo *p1 = &poblacion[fc[0]][fc[1]];
-                Individuo *p2 = &poblacion[fc[2]][fc[3]];
-                Individuo *hijo = &hijos_temp[i][j];
+                vecino_aleatorios(i, j, fc, semilla);
+                p1 = &poblacion[fc[0]][fc[1]];
+                p2 = &poblacion[fc[2]][fc[3]];
 
                 // Crossover + mutación
-                crossover_1p(p1, p2, hijo);
-                hay_mutacion = mutar(hijo);
+                crossover_1p(p1, p2, &hijo, semilla);
+                hay_mutacion = mutar(&hijo, semilla);
 
                 if(hay_mutacion)
                 {
-                    delta_I += IncMutI;
-                }
-                
-                hijo->fitness = evaluar(hijo);
-
-                if(hijo->fitness - poblacion[i][j].fitness < umbral_f_bajo)
-                {
-                    delta_I += IncPosI;
-                    delta_b += IncPosB;
-                    delta_c += IncPosC;
-                    delta_d += IncPosD;
+                    I += IncMutI;
                 }
 
-                if(hijo->fitness - poblacion[i][j].fitness > umbral_f_alto)
+                hijo.fitness = evaluar(&hijo);
+
+                if(hijo.fitness - poblacion[i][j].fitness < umbral_f_bajo)
                 {
-                    delta_I += IncNegI;
-                    delta_b += IncNegB;
-                    delta_c += IncNegC;
-                    delta_d += IncNegD;
+                    I += IncPosI;
+                    b += IncPosB;
+                    c += IncPosC;
+                    d += IncPosD;
                 }
-            }
-        }
 
-        //Hacemos la modificación de forma segura en secuencial además de otras comprobaciones que alteran los originales
-        I+=delta_I;
-        b+=delta_b;
-        c+=delta_c;
-        d+=delta_d;
-        Izhikevich_limitar_parametros(&b, &c, &d, &I);
-
-
-        hay_pico = Izhikevich(&v, &u, a, b, c, d, I);
-
-        if(hay_pico)
-        {
-            //printf("Ha habido pico\n");
-            ultimo_pico = 0;
-            ++picos_seguidos;
-            ++total_picos;
-        }
-        else 
-        {
-            if(picos_seguidos > 0)
-            {
-                ++ultimo_pico;
-                if(ultimo_pico > MAX_ULT_PICO)
+                if(hijo.fitness - poblacion[i][j].fitness > umbral_f_alto)
                 {
+                    I += IncNegI;
+                    b += IncNegB;
+                    c += IncNegC;
+                    d += IncNegD;
+                }
+
+                Izhikevich_limitar_parametros(&b, &c, &d, &I);
+
+
+                hay_pico = Izhikevich(&v, &u, a, b, c, d, I);
+
+                if(hay_pico)
+                {
+                    //printf("Ha habido pico\n");
                     ultimo_pico = 0;
-                    picos_seguidos = 0;
+                    ++picos_seguidos;
+                    #pragma omp critical
+                    {
+                        ++total_picos;
+                    }
                 }
-            }
-        }
+                else 
+                {
+                    if(picos_seguidos > 0)
+                    {
+                        ++ultimo_pico;
+                        if(ultimo_pico > MAX_ULT_PICO)
+                        {
+                            ultimo_pico = 0;
+                            picos_seguidos = 0;
+                        }
+                    }
+                }
 
-        if(picos_seguidos > MAX_PIC_SEG)
-        {
-            I += IncPicI;
-            b += IncPicB;
-            c += IncPicC;
-            d += IncPicD;
-            --picos_seguidos;
-        }
+                if(picos_seguidos > MAX_PIC_SEG)
+                {
+                    I += IncPicI;
+                    b += IncPicB;
+                    c += IncPicC;
+                    d += IncPicD;
+                    --picos_seguidos;
+                }
 
-        Izhikevich_limitar_parametros(&b, &c, &d, &I);
-        // Fuga dependiente del nivel de excitación
-        if (picos_seguidos > 5)
-            I *= 0.9f;
-        else
-            I *= 0.98f;
-
-        int nuevo_mejor_fitness_local=0;
-
-        //En paralelo hacemos los cambios de los hijos por los padres si hay pico o según si mejora el fitness, quedándonos con el máximo
-        #pragma omp parallel for reduction(max:nuevo_mejor_fitness_local)
-        for (int i = 0; i < N_ROWS; i++) {
-            for (int j = 0; j < N_COLS; j++) {
-                Individuo *h = &hijos_temp[i][j];
-                Individuo *p = &poblacion[i][j];
-                Individuo *dest = &nueva_poblacion[i][j];
-
-                if (hay_pico || h->fitness > p->fitness) {
-                    copiar(dest, h);
-                } 
+                Izhikevich_limitar_parametros(&b, &c, &d, &I);
+                // Fuga dependiente del nivel de excitación
+                if (picos_seguidos > 5)
+                    I *= 0.9f;
                 else
-                    copiar(dest, p);
+                    I *= 0.98f;
 
-                if (dest->fitness > nuevo_mejor_fitness_local) {
-                    nuevo_mejor_fitness_local = dest->fitness;
-                }
+                // Reemplazo elitista
+                if(hay_pico || hijo.fitness > poblacion[i][j].fitness)
+                {
+                    copiar(&nueva_poblacion[i][j], &hijo);
+                    #pragma omp critical
+                    {
+                        if(hijo.fitness > mejor_fitness_global)
+                        {
+                            copiar(&mejor_individuo, &hijo);
+                            mejor_fitness_global = hijo.fitness;
+                        }
+                    }
+                }  
+                else
+                    copiar(&nueva_poblacion[i][j], &poblacion[i][j]);
             }
         }
-
-        if (nuevo_mejor_fitness_local > mejor_fitness_global) {
-            mejor_fitness_global = nuevo_mejor_fitness_local;
-        }
+        /*
+        b = b / N_ROWS;
+        c = c / N_ROWS;
+        d = d / N_ROWS;
+        I = I / N_ROWS;
+        u = u / N_ROWS;
+        v = v / N_ROWS;
+        */
 
         // Copiar nueva población a actual
         for (int i = 0; i < N_ROWS; i++)
