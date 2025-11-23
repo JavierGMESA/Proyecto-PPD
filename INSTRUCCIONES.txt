@@ -14,4 +14,5 @@
         - Si queremos optimizar los parámetros de la versión de Izhikevich con openMP ejecutamos el "new_optimice_paral_param.py".
 
 - Para obtener las gráficas de los resultados de fitness:
-    - Simplemente ejecutamos el script "run_experiments.py", y cuando este haya acabado ejecutamos el script "analysis.py".
+    - Simplemente ejecutamos el script "run_experiments.py", y cuando este haya acabado ejecutamos el script "analysis.py". Las
+    gráficas con los resultados las escontrareis en la carpeta "ImagenesResultado".
