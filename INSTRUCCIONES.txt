@@ -1,0 +1,17 @@
+- Para compilar los programas: tenemos un fichero Makefile para compilarlos, así que haciendo simplemente "make all" compilais.
+
+- Para poder ejecutar cualquier de los scripts de python:
+    - Hay que entrar en el entorno virtual de python (es decir, que a la izquierda del prompt os salga "(venv)". Para ello 
+    simplemente meted en la terminal "source venv/bin/activate". Si por lo que sea luego quereis salir del entorno virtual 
+    simplemente escribid en la terminal "deactivate".
+
+- Para optimizar los parámetros de Izhikevich:
+    - Como sabreis ya las versiones de Izhikevich tienen unos parámetros dinámicos pero parten de ciertas variaciones que son estáticas
+    y que se introducen a la hora de ejecutar.
+    - Para poder optimizar estas variaciones están los scripts de python "optimize" (recordad que hay que ejecutarlos dentro del entorno
+    virtual de python:
+        - Si queremos optimizar los parámetros de la versión de Izhikevich secuencial ejecutamos el "new_optimice_param.py".
+        - Si queremos optimizar los parámetros de la versión de Izhikevich con openMP ejecutamos el "new_optimice_paral_param.py".
+
+- Para obtener las gráficas de los resultados de fitness:
+    - Simplemente ejecutamos el script "run_experiments.py", y cuando este haya acabado ejecutamos el script "analysis.py".

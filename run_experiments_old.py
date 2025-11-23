@@ -4,33 +4,19 @@ import csv
 import os
 import json
 
-
 # -------------------------------
 # CONFIGURACIÓN DE EXPERIMENTOS
 # -------------------------------
 N_RUNS = 5                              # Número de veces que se ejecuta cada programa
+EXEC_ELITE = "./cga_onemax"             # Ubicación versión elitista
+EXEC_IZHI  = "./cga_izhi_onemax"        # Ubicación versión izhikevich
 
-EXEC_ELITE       = "./cga_onemax"              # Ubicación versión elitista
-EXEC_IZHI        = "./cga_izhi_onemax"         # Ubicación versión izhikevich
-EXEC_ELITE_PARAL = "./cga_paral_onemax"        # Ubicación versión elitista paralela
-EXEC_IZHI_PARAL  = "./cga_paral_izhi_onemax"   # Ubicación versión izhikevich paralela
-
-C_ELITE       = ["gcc", "cga_onemax.c", "-o", "cga_onemax"]                     # Comando compilación elitista
-C_IZHI        = ["gcc", "cga_izhi_onemax.c", "-o", "cga_izhi_onemax"]           # Comando compilación izhikevich
-C_ELITE_PARAL = ["gcc", "cga_paral_onemax.c", "-o", "cga_paral_onemax", "-fopenmp"]     # Paralelo
-C_IZHI_PARAL  = ["gcc", "cga_paral_izhi_onemax.c", "-o", "cga_paral_izhi_onemax", "-fopenmp"]
-
-# Carpeta donde se guardan los CSV
-CSV_DIR = "./CSVs"
-os.makedirs(CSV_DIR, exist_ok=True)  # [web:13][web:7]
-
+C_ELITE = ["gcc", "cga_onemax.c", "-o", "cga_onemax"]               # Comando compilación elitista
+C_IZHI  = ["gcc", "cga_izhi_onemax.c", "-o", "cga_izhi_onemax"]     # Comando compilación izhikevich
 
 # Archivos donde están los mejores parámetros
-ARCHIVO_PARAMS_JSON_SEQ   = "mejores_parametros_random.json"
-ARCHIVO_PARAMS_TXT_SEQ    = "mejores_parametros_random.txt"
-ARCHIVO_PARAMS_JSON_PARAL = "mejores_parametros_paral_random.json"
-ARCHIVO_PARAMS_TXT_PARAL  = "mejores_parametros_paral_random.txt"
-
+ARCHIVO_PARAMS_JSON = "mejores_parametros_random.json"
+ARCHIVO_PARAMS_TXT = "mejores_parametros_random.txt"
 
 # Orden de los parámetros para pasarlos al programa C
 PARAM_ORDER = [
@@ -42,23 +28,23 @@ PARAM_ORDER = [
     "MAX_ULT_PICO", "MAX_PIC_SEG"
 ]
 
-
 # -------------------------------
 # FUNCIÓN PARA LEER PARÁMETROS
 # -------------------------------
-def leer_mejores_parametros(archivo_json, archivo_txt):
+def leer_mejores_parametros():
     """
     Lee los mejores parámetros desde el archivo JSON o TXT.
     Devuelve una lista con los valores en el orden correcto.
     """
     # Intentar primero con JSON (más fiable)
-    if os.path.exists(archivo_json):
-        print(f"📂 Leyendo parámetros desde {archivo_json}...")
+    if os.path.exists(ARCHIVO_PARAMS_JSON):
+        print(f"📂 Leyendo parámetros desde {ARCHIVO_PARAMS_JSON}...")
         try:
-            with open(archivo_json, 'r') as f:
+            with open(ARCHIVO_PARAMS_JSON, 'r') as f:
                 data = json.load(f)
                 params_dict = data.get("parametros", {})
                 
+            # Convertir a lista en el orden correcto
             params_list = []
             for param_name in PARAM_ORDER:
                 if param_name in params_dict:
@@ -75,11 +61,11 @@ def leer_mejores_parametros(archivo_json, archivo_txt):
             print(f"❌ Error al leer JSON: {e}")
     
     # Si no existe JSON, intentar con TXT
-    if os.path.exists(archivo_txt):
-        print(f"📂 Leyendo parámetros desde {archivo_txt}...")
+    if os.path.exists(ARCHIVO_PARAMS_TXT):
+        print(f"📂 Leyendo parámetros desde {ARCHIVO_PARAMS_TXT}...")
         try:
             params_dict = {}
-            with open(archivo_txt, 'r') as f:
+            with open(ARCHIVO_PARAMS_TXT, 'r') as f:
                 for line in f:
                     line = line.strip()
                     if '=' in line and not line.startswith('==='):
@@ -90,6 +76,7 @@ def leer_mejores_parametros(archivo_json, archivo_txt):
                             if key in PARAM_ORDER:
                                 params_dict[key] = value
             
+            # Convertir a lista en el orden correcto
             params_list = []
             for param_name in PARAM_ORDER:
                 if param_name in params_dict:
@@ -105,9 +92,8 @@ def leer_mejores_parametros(archivo_json, archivo_txt):
             print(f"❌ Error al leer TXT: {e}")
     
     print(f"❌ No se encontró ningún archivo de parámetros")
-    print(f"   Buscados: {archivo_json}, {archivo_txt}")
+    print(f"   Buscados: {ARCHIVO_PARAMS_JSON}, {ARCHIVO_PARAMS_TXT}")
     return None
-
 
 
 # -------------------------------
@@ -125,15 +111,6 @@ print("\n🔨 Compilando versión Izhikevich...")
 subprocess.run(C_IZHI, check=True)
 print("✅ Compilado: cga_izhi_onemax")
 
-print("\n🔨 Compilando versión elitista paralela...")
-subprocess.run(C_ELITE_PARAL, check=True)
-print("✅ Compilado: cga_paral_onemax")
-
-print("\n🔨 Compilando versión Izhikevich paralela...")
-subprocess.run(C_IZHI_PARAL, check=True)
-print("✅ Compilado: cga_paral_izhi_onemax")
-
-
 # -------------------------------
 # CARGAR PARÁMETROS IZHIKEVICH
 # -------------------------------
@@ -141,26 +118,17 @@ print("\n" + "="*60)
 print("CARGANDO PARÁMETROS IZHIKEVICH")
 print("="*60)
 
-params_izhi_seq   = leer_mejores_parametros(ARCHIVO_PARAMS_JSON_SEQ,   ARCHIVO_PARAMS_TXT_SEQ)
-params_izhi_paral = leer_mejores_parametros(ARCHIVO_PARAMS_JSON_PARAL, ARCHIVO_PARAMS_TXT_PARAL)
+params_izhi = leer_mejores_parametros()
 
-ejecutar_izhi_seq   = params_izhi_seq   is not None
-ejecutar_izhi_paral = params_izhi_paral is not None
-
-if ejecutar_izhi_seq:
-    print("\n📋 Parámetros secuenciales a utilizar:")
-    for i, param_name in enumerate(PARAM_ORDER):
-        print(f"   {param_name:15s} = {params_izhi_seq[i]}")
+if params_izhi is None:
+    print("\n⚠️ No se pudieron cargar los parámetros de Izhikevich")
+    print("⚠️ Solo se ejecutará la versión elitista")
+    ejecutar_izhi = False
 else:
-    print("\n⚠️ No se pudieron cargar los parámetros de Izhikevich secuencial")
-
-if ejecutar_izhi_paral:
-    print("\n📋 Parámetros paralelos a utilizar:")
+    ejecutar_izhi = True
+    print("\n📋 Parámetros a utilizar:")
     for i, param_name in enumerate(PARAM_ORDER):
-        print(f"   {param_name:15s} = {params_izhi_paral[i]}")
-else:
-    print("\n⚠️ No se pudieron cargar los parámetros de Izhikevich paralelo")
-
+        print(f"   {param_name:15s} = {params_izhi[i]}")
 
 # -------------------------------
 # REGEX PARA PARSEAR LA SALIDA
@@ -169,10 +137,15 @@ regex_elite = re.compile(r"Generación\s+(\d+).*Mejor fitness:\s+(\d+)")
 regex_izhi  = re.compile(r"Generación\s+(\d+).*Mejor fitness:\s+(\d+).*Picos presentados:\s+(\d+)")
 
 
-
 def ejecutar_y_guardar(comando, regex, run_id, etiqueta):
     """
     Ejecuta un programa y guarda los datos generación a generación en un CSV.
+    
+    Args:
+        comando: lista con el comando a ejecutar (ej: ["./programa", "arg1", "arg2"])
+        regex: expresión regular para parsear la salida
+        run_id: número de ejecución (1, 2, 3...)
+        etiqueta: "elite" o "izhi"
     """
     print(f"\n🔄 Ejecutando {etiqueta}, run {run_id}...")
 
@@ -183,11 +156,11 @@ def ejecutar_y_guardar(comando, regex, run_id, etiqueta):
         text=True
     )
 
-    csv_name = os.path.join(CSV_DIR, f"resultados_{etiqueta}_run{run_id}.csv")
+    csv_name = f"resultados_{etiqueta}_run{run_id}.csv"
 
     with open(csv_name, "w", newline="") as f:
         writer = csv.writer(f)
-        if etiqueta.startswith("izhi"):
+        if etiqueta == "izhi":
             writer.writerow(["gen", "fitness", "picos"])
         else:
             writer.writerow(["gen", "fitness"])
@@ -195,7 +168,7 @@ def ejecutar_y_guardar(comando, regex, run_id, etiqueta):
         for line in proc.stdout:
             m = regex.search(line)
             if m:
-                if etiqueta.startswith("izhi"):
+                if etiqueta == "izhi":
                     gen, fit, picos = m.groups()
                     writer.writerow([int(gen), int(fit), int(picos)])
                 else:
@@ -213,7 +186,6 @@ def ejecutar_y_guardar(comando, regex, run_id, etiqueta):
         print(f"  ✅ Guardado en {csv_name}")
 
 
-
 # -------------------------------
 # EJECUCIONES REPETIDAS
 # -------------------------------
@@ -221,7 +193,7 @@ print("\n" + "="*60)
 print("EJECUTANDO EXPERIMENTOS")
 print("="*60)
 
-# 1) Versión elitista secuencial
+# Ejecutar versión elitista
 print("\n" + "-"*60)
 print("VERSIÓN ELITISTA (sin Izhikevich)")
 print("-"*60)
@@ -229,38 +201,18 @@ print("-"*60)
 for run in range(1, N_RUNS + 1):
     ejecutar_y_guardar([EXEC_ELITE], regex_elite, run, "elite")
 
-# 2) Versión elitista paralela
-print("\n" + "-"*60)
-print("VERSIÓN ELITISTA PARALELA (sin Izhikevich)")
-print("-"*60)
-
-for run in range(1, N_RUNS + 1):
-    ejecutar_y_guardar([EXEC_ELITE_PARAL], regex_elite, run, "elite_paral")
-
-# 3) Versión Izhikevich secuencial
-if ejecutar_izhi_seq:
+# Ejecutar versión Izhikevich (si se cargaron los parámetros)
+if ejecutar_izhi:
     print("\n" + "-"*60)
-    print("VERSIÓN IZHIKEVICH (secuencial, con parámetros optimizados)")
+    print("VERSIÓN IZHIKEVICH (con parámetros optimizados)")
     print("-"*60)
     
     for run in range(1, N_RUNS + 1):
-        comando_izhi = [EXEC_IZHI] + params_izhi_seq
+        # Construir comando con parámetros
+        comando_izhi = [EXEC_IZHI] + params_izhi
         ejecutar_y_guardar(comando_izhi, regex_izhi, run, "izhi")
 else:
-    print("\n⚠️ Se omitieron las ejecuciones de Izhikevich secuencial (no hay parámetros)")
-
-# 4) Versión Izhikevich paralela
-if ejecutar_izhi_paral:
-    print("\n" + "-"*60)
-    print("VERSIÓN IZHIKEVICH PARALELA (con parámetros optimizados)")
-    print("-"*60)
-    
-    for run in range(1, N_RUNS + 1):
-        comando_izhi_paral = [EXEC_IZHI_PARAL] + params_izhi_paral
-        ejecutar_y_guardar(comando_izhi_paral, regex_izhi, run, "izhi_paral")
-else:
-    print("\n⚠️ Se omitieron las ejecuciones de Izhikevich paralela (no hay parámetros)")
-
+    print("\n⚠️ Se omitieron las ejecuciones de Izhikevich (no hay parámetros)")
 
 # -------------------------------
 # RESUMEN FINAL
@@ -270,17 +222,20 @@ print("RESUMEN DE EXPERIMENTOS")
 print("="*60)
 
 archivos_generados = []
-etiquetas = ["elite", "elite_paral", "izhi", "izhi_paral"]
-
 for run in range(1, N_RUNS + 1):
-    for et in etiquetas:
-        path = os.path.join(CSV_DIR, f"resultados_{et}_run{run}.csv")
-        if os.path.exists(path):
-            archivos_generados.append(path)
+    elite_csv = f"resultados_elite_run{run}.csv"
+    if os.path.exists(elite_csv):
+        archivos_generados.append(elite_csv)
+    
+    if ejecutar_izhi:
+        izhi_csv = f"resultados_izhi_run{run}.csv"
+        if os.path.exists(izhi_csv):
+            archivos_generados.append(izhi_csv)
 
 print(f"\n📊 Archivos CSV generados ({len(archivos_generados)}):")
 for archivo in archivos_generados:
     print(f"   ✓ {archivo}")
 
 print("\n✅ FIN DE EXPERIMENTOS")
+print("Ya tienes los CSV generados. Avisa cuando quieras generar las gráficas.")
 
