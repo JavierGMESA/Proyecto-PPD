@@ -78,10 +78,60 @@ void vecino_aleatorios(int fila, int col, int *fc) {
     }
 }
 
+/*
 Individuo* MPI_Comunicacion(const Individuo* mejor, const unsigned tama)
 {
 
 }
+*/
+
+Individuo* MPI_Comunicacion(const Individuo* mejor, const unsigned num_ejecuciones)
+{
+    // Matriz de genes: num_ejecuciones filas, L columnas
+    // Se reserva en todos para poder hacer el Bcast después
+    int *matriz_genes = (int*) malloc(num_ejecuciones * L * sizeof(int));
+    if (!matriz_genes) {
+        fprintf(stderr, "Error reservando memoria en MPI_Comunicacion\n");
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
+    // Cada proceso envía su mejor->genes (L ints).
+    // En el root (0) se recibe la matriz con todos (num_ejecuciones x L).
+    MPI_Gather(
+        (void*)mejor->genes, // buffer de envío: L ints
+        L,                   // número de ints que envía cada proceso
+        MPI_INT,
+        matriz_genes,        // solo se usa en root, pero debe existir en todos
+        L,                   // número de ints que recibe de cada proceso
+        MPI_INT,
+        0,                   // root
+        MPI_COMM_WORLD
+    );
+
+    // Root difunde la matriz completa a todos los procesos
+    MPI_Bcast(matriz_genes, num_ejecuciones * L, MPI_INT, 0,MPI_COMM_WORLD);
+
+    // Cada proceso crea un vector de Individuo a partir de la matriz
+    Individuo *mejores = (Individuo*) malloc(num_ejecuciones * sizeof(Individuo));
+    if (!mejores) {
+        fprintf(stderr, "Error reservando memoria para mejores\n");
+        free(matriz_genes);
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
+    for (unsigned r = 0; r < num_ejecuciones; ++r) {
+        // Copiar genes de la fila r
+        for (int i = 0; i < L; ++i) {
+            mejores[r].genes[i] = matriz_genes[r * L + i];
+        }
+        // Recalcular fitness (OneMax)
+        mejores[r].fitness = evaluar(&mejores[r]);
+    }
+
+    free(matriz_genes);
+    return mejores;   // El llamador hará free(mejores) cuando ya no lo necesite
+}
+
 
 
 // ------------------ PROGRAMA PRINCIPAL ------------------
@@ -100,12 +150,12 @@ int main(int argc, char *argv[]) {
     int myrank, size, tag = 1;
 
     MPI_Status status;
-    MPI.Init(&argc, &argv);
+    MPI_Init(&argc, &argv);
 
     MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    srand(time(NULL));
+    srand(time(NULL) + myrank);
 
     poblacion = (Individuo**) calloc(N_ROWS, sizeof(Individuo*));
     nueva_poblacion = (Individuo**) calloc(N_ROWS, sizeof(Individuo*));
@@ -145,11 +195,10 @@ int main(int argc, char *argv[]) {
             for (int j = 0; j < N_COLS; j++) {
 
                 // Selección de dos padres vecinos
-                int fc[4];
                 vecino_aleatorios(i, j, fc);
 
-                Individuo *p1 = &poblacion[fc[0]][fc[1]];
-                Individuo *p2 = &poblacion[fc[2]][fc[3]];
+                p1 = &poblacion[fc[0]][fc[1]];
+                p2 = &poblacion[fc[2]][fc[3]];
 
                 // Crossover + mutación
                 crossover_1p(p1, p2, &hijo);
@@ -171,17 +220,43 @@ int main(int argc, char *argv[]) {
             }
         }
 
+        //Cada GEN_MAX / 20 generaciones introducimos los mejores individuos de cada isla en nuestra población
+        //en posiciones aleatorias.
+        if(gen > 0 && gen % (GEN_MAX / 20) == 0)
+        {
+            Individuo* mejores = MPI_Comunicacion(&mejor_individuo, size);
+            for(int i2 = 0; i2 < size; ++i2)
+            {
+                int rand_row = rand_int(0, N_ROWS - 1);
+                int rand_col = rand_int(0, N_COLS - 1);
+                if(mejor_fitness_global < mejores[i2].fitness)
+                {
+                    copiar(&mejor_individuo, &mejores[i2]);
+                    mejor_fitness_global = mejores[i2].fitness;
+                }
+                copiar(&nueva_poblacion[rand_row][rand_col], &mejores[i2]);
+            }
+            free(mejores);
+        }
+
         // Copiar nueva población a actual
         for (int i = 0; i < N_ROWS; i++)
             for (int j = 0; j < N_COLS; j++)
                 copiar(&poblacion[i][j], &nueva_poblacion[i][j]);
 
-        printf("Generación %d | Mejor fitness: %d\n", gen, mejor_fitness_global);
+        if(myrank == 0)
+        {
+            printf("Generación %d | Mejor fitness: %d\n", gen, mejor_fitness_global);
+        }
     }
 
-    // Resultado final
-    printf("\n=== RESULTADO FINAL ===\n");
-    printf("Mejor fitness encontrado: %d\nMejor fitness posible: %d\n", mejor_fitness_global, L);
+    if(myrank == 0)
+    {
+        // Resultado final
+        printf("\n=== RESULTADO FINAL ===\n");
+        printf("Mejor fitness encontrado: %d\nMejor fitness posible: %d\n", mejor_fitness_global, L);
+    }
+    
     /*
     printf("Mejor individuo: ");
     for (int i = 0; i < L; i++)
