@@ -136,8 +136,8 @@ Individuo* MPI_Comunicacion(const Individuo* mejor, const unsigned num_ejecucion
 
 // ------------------ PROGRAMA PRINCIPAL ------------------
 
-int main(int argc, char *argv[]) {
-
+int main(int argc, char *argv[]) 
+{
     //Individuo poblacion[N_ROWS][N_COLS];
     //Individuo nueva_poblacion[N_ROWS][N_COLS];
     Individuo **poblacion, **nueva_poblacion;

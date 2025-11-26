@@ -142,8 +142,8 @@ void Izhikevich_limitar_parametros(float *b, float *c, float *d, float *I)
 
 // ------------------ PROGRAMA PRINCIPAL ------------------
 
-int main(int argc, char *argv[]) {
-
+int main(int argc, char *argv[]) 
+{
     if (argc != 21) 
     {
         printf("Uso: %s IniI IncMutI IncPosI IncNegI IncPicI IniA IniB IncPosB IncNegB IncPicB IniC IncPosC IncNegC IncPicC IniD IncPosD IncNegD IncPicD MAX_ULT_PICO MAX_PIC_SEG\n", argv[0]);
