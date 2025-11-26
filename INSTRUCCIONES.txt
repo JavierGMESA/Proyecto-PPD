@@ -38,3 +38,5 @@ export LD_LIBRARY_PATH=/opt/ompi-4.1.2/lib:$LD_LIBRARY_PATH
 
 mpirun -np 4 --hostfile hosts.txt ./cga_distrib_onemax
 mpirun -np 6 --hostfile hosts.txt --mca btl_tcp_if_include tailscale0 ./cga_distrib_onemax
+
+
