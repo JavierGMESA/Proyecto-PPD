@@ -78,6 +78,11 @@ void vecino_aleatorios(int fila, int col, int *fc) {
     }
 }
 
+Individuo* MPI_Comunicacion(const Individuo* mejor, const unsigned tama)
+{
+
+}
+
 
 // ------------------ PROGRAMA PRINCIPAL ------------------
 
