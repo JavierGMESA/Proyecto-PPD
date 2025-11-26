@@ -16,3 +16,15 @@
 - Para obtener las gráficas de los resultados de fitness:
     - Simplemente ejecutamos el script "run_experiments.py", y cuando este haya acabado ejecutamos el script "analysis.py". Las
     gráficas con los resultados las escontrareis en la carpeta "ImagenesResultado".
+
+
+
+
+
+
+
+
+
+
+
+mpirun -np 6 --hostfile hosts.txt --mca btl_tcp_if_include tailscale0 ./cga_distrib_onemax
