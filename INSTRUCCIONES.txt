@@ -5,6 +5,8 @@
     simplemente meted en la terminal "source venv/bin/activate". Si por lo que sea luego quereis salir del entorno virtual 
     simplemente escribid en la terminal "deactivate".
 
+- Antes de ejecutar nada hay que compilar todos los códigos: meter en la terminal "make all".
+
 - Para optimizar los parámetros de Izhikevich:
     - Como sabreis ya las versiones de Izhikevich tienen unos parámetros dinámicos pero parten de ciertas variaciones que son estáticas
     y que se introducen a la hora de ejecutar.
