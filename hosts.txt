@@ -1,2 +1,2 @@
-ee3218856638 slots=4
-100.90.130.107 slots=4
+HP-Javier-Garcia-Mesa slots=4
+jgm-server slots=4

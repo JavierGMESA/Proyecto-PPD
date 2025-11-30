@@ -1,9 +1,138 @@
+#include <mpi.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 #include "cga_param.h"
-#include "onemax.h"
-#include "onemax_mpi.h"
+
+typedef struct {
+    int genes[L];
+    int fitness;
+} Individuo;
+
+// ----------- FUNCIONES AUXILIARES -----------
+int rand_int(int min, int max) {
+    return min + rand() % (max - min + 1);
+}
+
+float rand_float() {
+    return (float) rand() / RAND_MAX;
+}
+
+// Evaluar OneMax
+int evaluar(const Individuo *ind) {
+    int s = 0;
+    for (int i = 0; i < L; i++)
+        s += ind->genes[i];
+    return s;
+}
+
+// Inicializar individuo aleatorio
+void inicializar_individuo(Individuo *ind) {
+    for (int i = 0; i < L; i++)
+        ind->genes[i] = rand_int(0, 1);
+    ind->fitness = evaluar(ind);
+}
+
+// Copiar individuo
+void copiar(Individuo *dest, const Individuo *src) {
+    for (int i = 0; i < L; i++)
+        dest->genes[i] = src->genes[i];
+    dest->fitness = src->fitness;
+}
+
+// Crossover de 1 punto
+void crossover_1p(const Individuo *p1, const Individuo *p2, Individuo *hijo) {
+    int punto = rand_int(1, L - 1);
+    for (int i = 0; i < L; i++) {
+        hijo->genes[i] = (i < punto) ? p1->genes[i] : p2->genes[i];
+    }
+}
+
+// Mutación (10% de probabilidad de invertir un bit al azar)
+void mutar(Individuo *ind) {
+    if (rand_float() < MUT_PROB) {
+        int pos = rand_int(0, L - 1);
+        ind->genes[pos] = 1 - ind->genes[pos];
+    }
+}
+
+// Obtener índice de vecino (von Neumann)
+void vecino_aleatorios(int fila, int col, int *fc) {
+    // fc[0], fc[1] -> primer vecino
+    // fc[2], fc[3] -> segundo vecino
+
+    // Movimientos posibles (arriba, abajo, izquierda, derecha)
+    int df[] = {-1, 1, 0, 0};
+    int dc[] = {0, 0, -1, 1};
+
+    for (int k = 0; k < 2; k++) {
+        int nf, nc;
+        do {
+            int dir = rand() % 4;
+            nf = fila + df[dir];
+            nc = col + dc[dir];
+        } while (nf < 0 || nf >= N_ROWS || nc < 0 || nc >= N_COLS);
+
+        fc[k * 2]     = nf;
+        fc[k * 2 + 1] = nc;
+    }
+}
+
+/*
+Individuo* MPI_Comunicacion(const Individuo* mejor, const unsigned tama)
+{
+
+}
+*/
+
+Individuo* MPI_Comunicacion(const Individuo* mejor, const unsigned num_ejecuciones)
+{
+    // Matriz de genes: num_ejecuciones filas, L columnas
+    // Se reserva en todos para poder hacer el Bcast después
+    int *matriz_genes = (int*) malloc(num_ejecuciones * L * sizeof(int));
+    if (!matriz_genes) {
+        fprintf(stderr, "Error reservando memoria en MPI_Comunicacion\n");
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
+    // Cada proceso envía su mejor->genes (L ints).
+    // En el root (0) se recibe la matriz con todos (num_ejecuciones x L).
+    MPI_Gather(
+        (void*)mejor->genes, // buffer de envío: L ints
+        L,                   // número de ints que envía cada proceso
+        MPI_INT,
+        matriz_genes,        // solo se usa en root, pero debe existir en todos
+        L,                   // número de ints que recibe de cada proceso
+        MPI_INT,
+        0,                   // root
+        MPI_COMM_WORLD
+    );
+
+    // Root difunde la matriz completa a todos los procesos
+    MPI_Bcast(matriz_genes, num_ejecuciones * L, MPI_INT, 0,MPI_COMM_WORLD);
+
+    // Cada proceso crea un vector de Individuo a partir de la matriz
+    Individuo *mejores = (Individuo*) malloc(num_ejecuciones * sizeof(Individuo));
+    if (!mejores) {
+        fprintf(stderr, "Error reservando memoria para mejores\n");
+        free(matriz_genes);
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
+    for (unsigned r = 0; r < num_ejecuciones; ++r) {
+        // Copiar genes de la fila r
+        for (int i = 0; i < L; ++i) {
+            mejores[r].genes[i] = matriz_genes[r * L + i];
+        }
+        // Recalcular fitness (OneMax)
+        mejores[r].fitness = evaluar(&mejores[r]);
+    }
+
+    free(matriz_genes);
+    return mejores;   // El llamador hará free(mejores) cuando ya no lo necesite
+}
+
+
 
 // ------------------ PROGRAMA PRINCIPAL ------------------
 
@@ -50,7 +179,7 @@ int main(int argc, char *argv[])
         for (j = 0; j < N_COLS; j++)
         {
             inicializar_individuo(&poblacion[i][j]);
-            if((i == 0 && j == 0) || mejor_fitness_f(evaluar(&poblacion[i][j]), mejor_fitness_global))
+            if((i == 0 && j == 0) || (evaluar(&poblacion[i][j]) > mejor_fitness_global))
             {
                 copiar(&mejor_individuo, &poblacion[i][j]);
                 mejor_fitness_global = evaluar(&poblacion[i][j]);
@@ -75,10 +204,10 @@ int main(int argc, char *argv[])
                 hijo.fitness = evaluar(&hijo);
 
                     // Reemplazo elitista
-                if (mejor_fitness_f(hijo.fitness, poblacion[i][j].fitness))
+                if (hijo.fitness > poblacion[i][j].fitness)
                 {
                     copiar(&nueva_poblacion[i][j], &hijo);
-                    if(mejor_fitness_f(hijo.fitness, mejor_fitness_global))
+                    if(hijo.fitness > mejor_fitness_global)
                     {
                         copiar(&mejor_individuo, &hijo);
                         mejor_fitness_global = hijo.fitness;
@@ -98,7 +227,7 @@ int main(int argc, char *argv[])
             {
                 int rand_row = rand_int(0, N_ROWS - 1);
                 int rand_col = rand_int(0, N_COLS - 1);
-                if(mejor_fitness_f(mejores[i2].fitness, mejor_fitness_global))
+                if(mejor_fitness_global < mejores[i2].fitness)
                 {
                     copiar(&mejor_individuo, &mejores[i2]);
                     mejor_fitness_global = mejores[i2].fitness;

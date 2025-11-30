@@ -18,15 +18,6 @@ EXEC_IZHI_DISTRIB  = "./cga_distrib_izhi_onemax"
 EXEC_ELITE_HIBRID  = "./cga_hibrid_onemax"
 EXEC_IZHI_HIBRID   = "./cga_hibrid_izhi_onemax"
 
-C_ELITE         = ["gcc", "cga_onemax.c", "-o", "cga_onemax"]
-C_IZHI          = ["gcc", "cga_izhi_onemax.c", "-o", "cga_izhi_onemax"]
-C_ELITE_PARAL   = ["gcc", "cga_paral_onemax.c", "-o", "cga_paral_onemax", "-fopenmp"]
-C_IZHI_PARAL    = ["gcc", "cga_paral_izhi_onemax.c", "-o", "cga_paral_izhi_onemax", "-fopenmp"]
-C_ELITE_DISTRIB = ["mpicc", "cga_distrib_onemax.c", "-o", "cga_distrib_onemax"]
-C_IZHI_DISTRIB  = ["mpicc", "cga_distrib_izhi_onemax.c", "-o", "cga_distrib_izhi_onemax"]
-C_ELITE_HIBRID  = ["mpicc", "cga_hibrid_onemax.c", "-fopenmp", "-o", "cga_hibrid_onemax"]
-C_IZHI_HIBRID   = ["mpicc", "cga_hibrid_izhi_onemax.c", "-fopenmp", "-o", "cga_hibrid_izhi_onemax"]
-
 # MPI (para distrib e híbrido)
 N_PROCESOS = 6
 HOSTFILE   = "hosts.txt"
@@ -34,7 +25,7 @@ IFACE      = "tailscale0"
 
 # Carpeta donde se guardan los CSV
 CSV_DIR = "./CSVs"
-os.makedirs(CSV_DIR, exist_ok=True)  # [web:84]
+os.makedirs(CSV_DIR, exist_ok=True)
 
 # Archivos de mejores parámetros
 ARCHIVO_PARAMS_JSON_SEQ    = "mejores_parametros_random.json"
@@ -107,44 +98,26 @@ def leer_mejores_parametros(archivo_json, archivo_txt):
 
 
 # -------------------------------
-# COMPILACIÓN
+# COMPROBAR QUE EXISTEN BINARIOS
 # -------------------------------
+def check_exec(path):
+    if not os.path.exists(path):
+        print(f"❌ ERROR: no se encuentra el ejecutable '{path}'")
+        print("   Asegúrate de haber ejecutado 'make' antes de este script.")
+        return False
+    return True
+
 print("="*60)
-print("COMPILANDO PROGRAMAS")
+print("COMPROBANDO EJECUTABLES")
 print("="*60)
 
-print("\n🔨 Compilando versión elitista secuencial...")
-subprocess.run(C_ELITE, check=True)
-print("✅ Compilado: cga_onemax")
-
-print("\n🔨 Compilando versión Izhikevich secuencial...")
-subprocess.run(C_IZHI, check=True)
-print("✅ Compilado: cga_izhi_onemax")
-
-print("\n🔨 Compilando versión elitista paralela (OpenMP)...")
-subprocess.run(C_ELITE_PARAL, check=True)
-print("✅ Compilado: cga_paral_onemax")
-
-print("\n🔨 Compilando versión Izhikevich paralela (OpenMP)...")
-subprocess.run(C_IZHI_PARAL, check=True)
-print("✅ Compilado: cga_paral_izhi_onemax")
-
-print("\n🔨 Compilando versión elitista distribuida (MPI)...")
-subprocess.run(C_ELITE_DISTRIB, check=True)
-print("✅ Compilado: cga_distrib_onemax")
-
-print("\n🔨 Compilando versión Izhikevich distribuida (MPI)...")
-subprocess.run(C_IZHI_DISTRIB, check=True)
-print("✅ Compilado: cga_distrib_izhi_onemax")
-
-print("\n🔨 Compilando versión elitista híbrida (MPI+OpenMP)...")
-subprocess.run(C_ELITE_HIBRID, check=True)
-print("✅ Compilado: cga_hibrid_onemax")
-
-print("\n🔨 Compilando versión Izhikevich híbrida (MPI+OpenMP)...")
-subprocess.run(C_IZHI_HIBRID, check=True)
-print("✅ Compilado: cga_hibrid_izhi_onemax")
-
+for exe in [
+    EXEC_ELITE, EXEC_IZHI,
+    EXEC_ELITE_PARAL, EXEC_IZHI_PARAL,
+    EXEC_ELITE_DISTRIB, EXEC_IZHI_DISTRIB,
+    EXEC_ELITE_HIBRID, EXEC_IZHI_HIBRID
+]:
+    check_exec(exe)
 
 # -------------------------------
 # CARGAR PARÁMETROS IZHIKEVICH
@@ -153,23 +126,21 @@ print("\n" + "="*60)
 print("CARGANDO PARÁMETROS IZHIKEVICH")
 print("="*60)
 
-params_izhi_seq    = leer_mejores_parametros(ARCHIVO_PARAMS_JSON_SEQ,   ARCHIVO_PARAMS_TXT_SEQ)
-params_izhi_paral  = leer_mejores_parametros(ARCHIVO_PARAMS_JSON_PARAL, ARCHIVO_PARAMS_TXT_PARAL)
-params_izhi_distrib= leer_mejores_parametros(ARCHIVO_PARAMS_JSON_DISTR, ARCHIVO_PARAMS_TXT_DISTR)
-params_izhi_hibrid = leer_mejores_parametros(ARCHIVO_PARAMS_JSON_HIBRID,ARCHIVO_PARAMS_TXT_HIBRID)
+params_izhi_seq     = leer_mejores_parametros(ARCHIVO_PARAMS_JSON_SEQ,   ARCHIVO_PARAMS_TXT_SEQ)
+params_izhi_paral   = leer_mejores_parametros(ARCHIVO_PARAMS_JSON_PARAL, ARCHIVO_PARAMS_TXT_PARAL)
+params_izhi_distrib = leer_mejores_parametros(ARCHIVO_PARAMS_JSON_DISTR, ARCHIVO_PARAMS_TXT_DISTR)
+params_izhi_hibrid  = leer_mejores_parametros(ARCHIVO_PARAMS_JSON_HIBRID,ARCHIVO_PARAMS_TXT_HIBRID)
 
-ejecutar_izhi_seq     = params_izhi_seq    is not None
-ejecutar_izhi_paral   = params_izhi_paral  is not None
+ejecutar_izhi_seq     = params_izhi_seq     is not None
+ejecutar_izhi_paral   = params_izhi_paral   is not None
 ejecutar_izhi_distrib = params_izhi_distrib is not None
-ejecutar_izhi_hibrid  = params_izhi_hibrid is not None
-
+ejecutar_izhi_hibrid  = params_izhi_hibrid  is not None
 
 # -------------------------------
 # REGEX PARA PARSEAR LA SALIDA
 # -------------------------------
 regex_elite = re.compile(r"Generación\s+(\d+).*Mejor fitness:\s+(\d+)")
 regex_izhi  = re.compile(r"Generación\s+(\d+).*Mejor fitness:\s+(\d+).*Picos presentados:\s+(\d+)")
-
 
 def ejecutar_y_guardar(comando, regex, run_id, etiqueta):
     """
@@ -213,7 +184,6 @@ def ejecutar_y_guardar(comando, regex, run_id, etiqueta):
             print(f"  Error: {stderr_output}")
     else:
         print(f"  ✅ Guardado en {csv_name}")
-
 
 # -------------------------------
 # EJECUCIONES REPETIDAS
@@ -320,7 +290,6 @@ if ejecutar_izhi_hibrid:
 else:
     print("\n⚠️ Se omite Izhikevich híbrida (no hay parámetros)")
 
-
 # -------------------------------
 # RESUMEN FINAL
 # -------------------------------
@@ -345,6 +314,6 @@ for archivo in archivos_generados:
     print(f"   ✓ {archivo}")
 
 print("\n✅ FIN DE EXPERIMENTOS")
-print("Ya tienes los CSV generados. Luego el analysis.py leerá desde ./CSVs.")
+
 
 

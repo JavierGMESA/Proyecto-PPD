@@ -3,12 +3,7 @@
 #include <time.h>
 #include <omp.h>
 #include "cga_param.h"
-//#include "izhi_param.h"
-
-typedef struct {
-    int genes[L];
-    int fitness;
-} Individuo;
+#include "onemax.h"
 
 //Variable para Izhikevich
 float IniI, IncMutI, IncPosI, IncNegI, IncPicI;
@@ -17,128 +12,6 @@ float IniB, IncPosB, IncNegB, IncPicB;
 float IniC, IncPosC, IncNegC, IncPicC;
 float IniD, IncPosD, IncNegD, IncPicD;
 int MAX_ULT_PICO, MAX_PIC_SEG;
-
-
-// ----------- FUNCIONES AUXILIARES -----------
-int rand_int(int min, int max) {
-    return min + rand() % (max - min + 1);
-}
-
-int rand_int_r(int min, int max, unsigned *semilla) {
-    return min + rand_r(semilla) % (max - min + 1);
-}
-
-float rand_float(unsigned *semilla) {
-    return (float) rand_r(semilla) / RAND_MAX;
-}
-
-// Evaluar OneMax
-int evaluar(const Individuo *ind) {
-    int s = 0;
-    for (int i = 0; i < L; i++)
-        s += ind->genes[i];
-    return s;
-}
-
-// Inicializar individuo aleatorio
-void inicializar_individuo(Individuo *ind) {
-    for (int i = 0; i < L; i++)
-        ind->genes[i] = rand_int(0, 1);
-    ind->fitness = evaluar(ind);
-}
-
-// Copiar individuo
-void copiar(Individuo *dest, const Individuo *src) 
-{
-    for (int i = 0; i < L; i++)
-        dest->genes[i] = src->genes[i];
-    dest->fitness = src->fitness;
-}
-
-// Crossover de 1 punto
-void crossover_1p(const Individuo *p1, const Individuo *p2, Individuo *hijo, unsigned *semilla) 
-{
-    int punto = rand_int_r(1, L - 1, semilla);
-    for (int i = 0; i < L; i++) 
-    {
-        hijo->genes[i] = (i < punto) ? p1->genes[i] : p2->genes[i];
-    }
-}
-
-// Mutación (10% de probabilidad de invertir un bit al azar)
-short mutar(Individuo *ind, unsigned *semilla) 
-{
-    if (rand_float(semilla) < MUT_PROB) 
-    {
-        int pos = rand_int_r(0, L - 1, semilla);
-        ind->genes[pos] = 1 - ind->genes[pos];
-        return 1;
-    }
-    else 
-    {
-        return 0;
-    }
-}
-
-// Obtener índice de vecino (von Neumann)
-void vecino_aleatorios(int fila, int col, int *fc, unsigned *semilla) {
-    // fc[0], fc[1] -> primer vecino
-    // fc[2], fc[3] -> segundo vecino
-
-    // Movimientos posibles (arriba, abajo, izquierda, derecha)
-    int df[] = {-1, 1, 0, 0};
-    int dc[] = {0, 0, -1, 1};
-
-    for (int k = 0; k < 2; k++) {
-        int nf, nc;
-        do {
-            int dir = rand_r(semilla) % 4;
-            nf = fila + df[dir];
-            nc = col + dc[dir];
-        } while (nf < 0 || nf >= N_ROWS || nc < 0 || nc >= N_COLS);
-
-        fc[k * 2]     = nf;
-        fc[k * 2 + 1] = nc;
-    }
-}
-
-//Actualizar 'v' y 'u' de Izhikevich
-int Izhikevich(float *v, float *u, float a, float b, float c, float d, float I)
-{
-    float dt = 1.0f;  // paso de tiempo
-    *v += dt * (0.04f * (*v) * (*v) + 5.0f * (*v) + 140.0f - (*u) + I);
-    *u += dt * (a * (b * (*v) - (*u)));
-
-    //Limites para evitar el Nan (Not a number)
-    if (*v < -200.0f) *v = -200.0f;
-    if (*v > 200.0f) *v = 200.0f;
-
-    if(*v > 30)
-    {
-        *v = c;
-        *u = (*u) + d;
-        return 1;
-    }
-    else 
-    {
-        return 0;
-    }
-}
-
-void Izhikevich_limitar_parametros(float *b, float *c, float *d, float *I)
-{
-    if (*I < 0) *I = 0;
-    if (*I > 20) *I = 20;
-
-    if (*b < 0.05) *b = 0.05;
-    if (*b > 0.3)  *b = 0.3;
-
-    if (*c < -80)  *c = -80;
-    if (*c > -30)  *c = -30;
-
-    if (*d < 0)    *d = 0;
-    if (*d > 8)    *d = 8;
-}
 
 // ------------------ PROGRAMA PRINCIPAL ------------------
 
@@ -220,7 +93,7 @@ int main(int argc, char *argv[])
         for (int j = 0; j < N_COLS; j++)
         {
             inicializar_individuo(&poblacion[i][j]);
-            if((i == 0 && j == 0) || (evaluar(&poblacion[i][j]) > mejor_fitness_global))
+            if((i == 0 && j == 0) || mejor_fitness_f(evaluar(&poblacion[i][j]), mejor_fitness_global))
             {
                 copiar(&mejor_individuo, &poblacion[i][j]);
                 mejor_fitness_global = evaluar(&poblacion[i][j]);
@@ -251,13 +124,13 @@ int main(int argc, char *argv[])
                 semilla = &seed_array[tid];   // cada hilo su propia semilla
 
                 // Selección de dos padres vecinos
-                vecino_aleatorios(i, j, fc, semilla);
+                vecino_aleatorios_r(i, j, fc, semilla);
                 p1 = &poblacion[fc[0]][fc[1]];
                 p2 = &poblacion[fc[2]][fc[3]];
 
                 // Crossover + mutación
-                crossover_1p(p1, p2, &hijo, semilla);
-                hay_mutacion = mutar(&hijo, semilla);
+                crossover_1p_r(p1, p2, &hijo, semilla);
+                hay_mutacion = mutar_r(&hijo, semilla);
 
                 if(hay_mutacion)
                 {
@@ -327,12 +200,12 @@ int main(int argc, char *argv[])
                     I *= 0.98f;
 
                 // Reemplazo elitista
-                if(hay_pico || hijo.fitness > poblacion[i][j].fitness)
+                if(hay_pico || mejor_fitness_f(hijo.fitness, poblacion[i][j].fitness))
                 {
                     copiar(&nueva_poblacion[i][j], &hijo);
                     #pragma omp critical
                     {
-                        if(hijo.fitness > mejor_fitness_global)
+                        if(mejor_fitness_f(hijo.fitness, mejor_fitness_global))
                         {
                             copiar(&mejor_individuo, &hijo);
                             mejor_fitness_global = hijo.fitness;

@@ -2,8 +2,12 @@
 #include <stdlib.h>
 #include <time.h>
 #include "cga_param.h"
-#include "onemax.h"
-#include "onemax_mpi.h"
+//#include "izhi_param.h"
+
+typedef struct {
+    int genes[L];
+    int fitness;
+} Individuo;
 
 //Variable para Izhikevich
 float IniI, IncMutI, IncPosI, IncNegI, IncPicI;
@@ -12,6 +16,124 @@ float IniB, IncPosB, IncNegB, IncPicB;
 float IniC, IncPosC, IncNegC, IncPicC;
 float IniD, IncPosD, IncNegD, IncPicD;
 int MAX_ULT_PICO, MAX_PIC_SEG;
+
+
+// ----------- FUNCIONES AUXILIARES -----------
+int rand_int(int min, int max) {
+    return min + rand() % (max - min + 1);
+}
+
+float rand_float() {
+    return (float) rand() / RAND_MAX;
+}
+
+// Evaluar OneMax
+int evaluar(const Individuo *ind) {
+    int s = 0;
+    for (int i = 0; i < L; i++)
+        s += ind->genes[i];
+    return s;
+}
+
+// Inicializar individuo aleatorio
+void inicializar_individuo(Individuo *ind) {
+    for (int i = 0; i < L; i++)
+        ind->genes[i] = rand_int(0, 1);
+    ind->fitness = evaluar(ind);
+}
+
+// Copiar individuo
+void copiar(Individuo *dest, const Individuo *src) 
+{
+    for (int i = 0; i < L; i++)
+        dest->genes[i] = src->genes[i];
+    dest->fitness = src->fitness;
+}
+
+// Crossover de 1 punto
+void crossover_1p(const Individuo *p1, const Individuo *p2, Individuo *hijo) 
+{
+    int punto = rand_int(1, L - 1);
+    for (int i = 0; i < L; i++) 
+    {
+        hijo->genes[i] = (i < punto) ? p1->genes[i] : p2->genes[i];
+    }
+}
+
+// Mutación (10% de probabilidad de invertir un bit al azar)
+short mutar(Individuo *ind) 
+{
+    if (rand_float() < MUT_PROB) 
+    {
+        int pos = rand_int(0, L - 1);
+        ind->genes[pos] = 1 - ind->genes[pos];
+        return 1;
+    }
+    else 
+    {
+        return 0;
+    }
+}
+
+// Obtener índice de vecino (von Neumann)
+void vecino_aleatorios(int fila, int col, int *fc) {
+    // fc[0], fc[1] -> primer vecino
+    // fc[2], fc[3] -> segundo vecino
+
+    // Movimientos posibles (arriba, abajo, izquierda, derecha)
+    int df[] = {-1, 1, 0, 0};
+    int dc[] = {0, 0, -1, 1};
+
+    for (int k = 0; k < 2; k++) {
+        int nf, nc;
+        do {
+            int dir = rand() % 4;
+            nf = fila + df[dir];
+            nc = col + dc[dir];
+        } while (nf < 0 || nf >= N_ROWS || nc < 0 || nc >= N_COLS);
+
+        fc[k * 2]     = nf;
+        fc[k * 2 + 1] = nc;
+    }
+}
+
+//Actualizar 'v' y 'u' de Izhikevich
+int Izhikevich(float *v, float *u, float a, float b, float c, float d, float I)
+{
+    float dt = 1.0f;  // paso de tiempo
+    *v += dt * (0.04f * (*v) * (*v) + 5.0f * (*v) + 140.0f - (*u) + I);
+    *u += dt * (a * (b * (*v) - (*u)));
+
+    //Limites para evitar el Nan (Not a number)
+    if (*v < -200.0f) *v = -200.0f;
+    if (*v > 200.0f) *v = 200.0f;
+
+    if(*v > 30)
+    {
+        *v = c;
+        *u = (*u) + d;
+        return 1;
+    }
+    else 
+    {
+        return 0;
+    }
+}
+
+void Izhikevich_limitar_parametros(float *b, float *c, float *d, float *I)
+{
+    if (*I < 0) *I = 0;
+    if (*I > 20) *I = 20;
+
+    if (*b < 0.05) *b = 0.05;
+    if (*b > 0.3)  *b = 0.3;
+
+    if (*c < -80)  *c = -80;
+    if (*c > -30)  *c = -30;
+
+    if (*d < 0)    *d = 0;
+    if (*d > 8)    *d = 8;
+}
 
 // ------------------ PROGRAMA PRINCIPAL ------------------
 
@@ -51,30 +173,12 @@ int main(int argc, char *argv[]) {
     MAX_ULT_PICO = atoi(argv[idx++]);
     MAX_PIC_SEG  = atoi(argv[idx++]);
 
-    Individuo **poblacion, **nueva_poblacion;
-    Individuo hijo, mejor_individuo;
-    Individuo *p1, *p2;
-    int mejor_fitness_global = 0;
-    int i, j;
-    int fc[4];
-    float v, u;
-    float a = IniA, b = IniB, c = IniC, d = IniD, I = IniI;
-    v = c;
-    u = b * v;
-    short hay_mutacion, hay_pico;
-    long total_picos = 0;
-    int ultimo_pico = 0, picos_seguidos = 0, umbral_f_bajo = 1, umbral_f_alto = 2;
 
-    int myrank, size, tag = 1;
-
-    MPI_Init(&argc, &argv);
-    MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
-
-    srand(time(NULL) + myrank);
+    srand(time(NULL));
 
     //Individuo poblacion[N_ROWS][N_COLS];
     //Individuo nueva_poblacion[N_ROWS][N_COLS];
+    Individuo **poblacion, **nueva_poblacion;
     poblacion = (Individuo**) calloc(N_ROWS, sizeof(Individuo*));
     nueva_poblacion = (Individuo**) calloc(N_ROWS, sizeof(Individuo*));
     if(!poblacion || !nueva_poblacion)
@@ -82,6 +186,7 @@ int main(int argc, char *argv[]) {
         printf("Ha habido error en la reserva de memoria");
         return 1;
     }
+    int i;
     for(i = 0; i < N_ROWS; ++i)
     {
         poblacion[i] = (Individuo*) calloc (N_COLS, sizeof(Individuo));
@@ -93,12 +198,22 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    Individuo hijo, mejor_individuo;
+    int mejor_fitness_global = 0;
+    float v, u;
+    float a = IniA, b = IniB, c = IniC, d = IniD, I = IniI;
+    v = c;
+    u = b * v;
+    short hay_mutacion, hay_pico;
+    long total_picos = 0;
+    int ultimo_pico = 0, picos_seguidos = 0, umbral_f_bajo = 1, umbral_f_alto = 2;
+
     // Inicializar población
     for (i = 0; i < N_ROWS; i++)
         for (int j = 0; j < N_COLS; j++)
         {
             inicializar_individuo(&poblacion[i][j]);
-            if((i == 0 && j == 0) || mejor_fitness_f(evaluar(&poblacion[i][j]), mejor_fitness_global))
+            if((i == 0 && j == 0) || (evaluar(&poblacion[i][j]) > mejor_fitness_global))
             {
                 copiar(&mejor_individuo, &poblacion[i][j]);
                 mejor_fitness_global = evaluar(&poblacion[i][j]);
@@ -116,9 +231,10 @@ int main(int argc, char *argv[]) {
             {
 
                 // Selección de dos padres vecinos
+                int fc[4];
                 vecino_aleatorios(i, j, fc);
-                p1 = &poblacion[fc[0]][fc[1]];
-                p2 = &poblacion[fc[2]][fc[3]];
+                Individuo *p1 = &poblacion[fc[0]][fc[1]];
+                Individuo *p2 = &poblacion[fc[2]][fc[3]];
 
                 // Crossover + mutación
                 crossover_1p(p1, p2, &hijo);
@@ -189,10 +305,10 @@ int main(int argc, char *argv[]) {
                     I *= 0.98f;
 
                 // Reemplazo elitista
-                if(hay_pico || mejor_fitness_f(hijo.fitness, poblacion[i][j].fitness))
+                if(hay_pico || hijo.fitness > poblacion[i][j].fitness)
                 {
                     copiar(&nueva_poblacion[i][j], &hijo);
-                    if(mejor_fitness_f(hijo.fitness, mejor_fitness_global))
+                    if(hijo.fitness > mejor_fitness_global)
                     {
                         copiar(&mejor_individuo, &hijo);
                         mejor_fitness_global = hijo.fitness;
@@ -203,44 +319,18 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        //Cada GEN_MAX / 20 generaciones introducimos los mejores individuos de cada isla en nuestra población
-        //en posiciones aleatorias.
-        if(gen > 0 && gen % (GEN_MAX / 20) == 0)
-        {
-            Individuo* mejores = MPI_Comunicacion(&mejor_individuo, size);
-            for(int i2 = 0; i2 < size; ++i2)
-            {
-                int rand_row = rand_int(0, N_ROWS - 1);
-                int rand_col = rand_int(0, N_COLS - 1);
-                if(mejor_fitness_f(mejores[i2].fitness, mejor_fitness_global))
-                {
-                    copiar(&mejor_individuo, &mejores[i2]);
-                    mejor_fitness_global = mejores[i2].fitness;
-                }
-                copiar(&nueva_poblacion[rand_row][rand_col], &mejores[i2]);
-            }
-            free(mejores);
-        }
-
         // Copiar nueva población a actual
         for (int i = 0; i < N_ROWS; i++)
             for (int j = 0; j < N_COLS; j++)
                 copiar(&poblacion[i][j], &nueva_poblacion[i][j]);
 
-        if(myrank == 0)
-        {
-            printf("Generación %d\t|  Mejor fitness: %d  |  Picos presentados: %ld\n", gen, mejor_fitness_global, total_picos);
-            printf("v: %f  u: %f\n", v, u);
-        }
+        printf("Generación %d\t|  Mejor fitness: %d  |  Picos presentados: %ld\n", gen, mejor_fitness_global, total_picos);
+        printf("v: %f  u: %f\n", v, u);
     }
 
-    if(myrank == 0)
-    {
-        // Resultado final
-        printf("\n=== RESULTADO FINAL ===\n");
-        printf("Mejor fitness encontrado: %d\nMejor fitness posible: %d\n", mejor_fitness_global, L);
-    }
-
+    // Resultado final
+    printf("\n=== RESULTADO FINAL ===\n");
+    printf("Mejor fitness encontrado: %d\nMejor fitness posible: %d\n", mejor_fitness_global, L);
     //printf("Ha habido un total de %ld picos\n", total_picos);
     /*
     printf("Mejor individuo: ");
@@ -256,8 +346,6 @@ int main(int argc, char *argv[]) {
     }
     free(poblacion);
     free(nueva_poblacion);
-
-    MPI_Finalize();
 
     return 0;
 }
