@@ -54,4 +54,6 @@ int Izhikevich(float *v, float *u, float a, float b, float c, float d, float I);
 
 void Izhikevich_limitar_parametros(float *b, float *c, float *d, float *I);
 
+void destroy_truck_evaluator();
+
 #endif

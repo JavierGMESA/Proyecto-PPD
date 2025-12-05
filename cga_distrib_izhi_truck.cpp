@@ -257,5 +257,7 @@ int main(int argc, char *argv[]) {
 
     MPI_Finalize();
 
+    destroy_truck_evaluator();
+
     return 0;
 }

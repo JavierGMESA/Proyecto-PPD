@@ -46,6 +46,8 @@ Individuo* MPI_Comunicacion(const Individuo* mejor, const unsigned num_ejecucion
 
     for (unsigned r = 0; r < num_ejecuciones; ++r) {
         // Copiar genes de la fila r
+        mejores[r].genes.clear();
+        mejores[r].genes.reserve(tam);
         for (int i = 0; i < tam; ++i) {
             mejores[r].genes.push_back(matriz_genes[r * tam + i] != 0);
         }
@@ -54,5 +56,6 @@ Individuo* MPI_Comunicacion(const Individuo* mejor, const unsigned num_ejecucion
     }
 
     delete[] matriz_genes;
+    delete[] send_buf;
     return mejores;   // El llamador hará delete[] mejores cuando ya no lo necesite
 }

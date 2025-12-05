@@ -225,5 +225,7 @@ int main(int argc, char *argv[]) {
     delete[] poblacion;
     delete[] nueva_poblacion; 
 
+    destroy_truck_evaluator();
+
     return 0;
 }

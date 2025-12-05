@@ -114,7 +114,7 @@ int main(int argc, char *argv[])
     for (int gen = 0; gen < GEN_MAX; gen++) 
     {
         total_picos = 0;
-        #pragma omp parallel for shared(a, poblacion, nueva_poblacion, mejor_fitness_global,) private(i, j, fc, p1, p2, hijo) lastprivate(b, c, d, I, v, u, picos_seguidos, ultimo_pico) default(shared)
+        #pragma omp parallel for shared(a, poblacion, nueva_poblacion, mejor_fitness_global) private(i, j, fc, p1, p2, hijo) lastprivate(b, c, d, I, v, u, picos_seguidos, ultimo_pico) default(shared)
         for (i = 0; i < N_ROWS; i++) 
         {
             for (j = 0; j < N_COLS; j++) 
@@ -251,6 +251,8 @@ int main(int argc, char *argv[])
     //free(nueva_poblacion);
     delete[] poblacion;
     delete[] nueva_poblacion;
+
+    destroy_truck_evaluator();
 
     return 0;
 }

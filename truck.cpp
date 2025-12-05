@@ -29,6 +29,7 @@ float rand_float_r(unsigned *semilla) {
 }
 
 double evaluar(Individuo *ind) {
+    init_truck_evaluator();
     double s = 0;
     EvaluationResult res = evaluator->evaluate(ind->genes);
     s = res.green_kms / MAX_GREEN_KMS + (1 - res.total_emissions / MAX_TOTAL_EMISIONS);
@@ -43,6 +44,8 @@ double evaluar(Individuo *ind) {
 void inicializar_individuo(Individuo *ind) {
     init_truck_evaluator();
     int tam = evaluator->getRouteSize();
+    ind->genes.clear();
+    ind->genes.reserve(tam);
     for (int i = 0; i < tam; i++)
         ind->genes.push_back(rand_int(0, 1) == 0);;
     ind->fitness = evaluar(ind);
@@ -57,8 +60,11 @@ void crossover_1p(const Individuo *p1, const Individuo *p2, Individuo *hijo)
 {
     int tam = p1->genes.size();
     int punto = rand_int(1, tam - 1);
+    hijo->genes.clear();
+    hijo->genes.reserve(tam);
     for (int i = 0; i < tam; i++) {
-        hijo->genes[i] = (i < punto) ? p1->genes[i] : p2->genes[i];
+        //hijo->genes[i] = (i < punto) ? p1->genes[i] : p2->genes[i];
+        hijo->genes.push_back((i < punto) ? p1->genes[i] : p2->genes[i]);
     }
 }
 
@@ -66,9 +72,12 @@ void crossover_1p_r(const Individuo *p1, const Individuo *p2, Individuo *hijo, u
 {
     int tam = p1->genes.size();
     int punto = rand_int_r(1, tam - 1, semilla);
+    hijo->genes.clear();
+    hijo->genes.reserve(tam);
     for (int i = 0; i < tam; i++) 
     {
-        hijo->genes[i] = (i < punto) ? p1->genes[i] : p2->genes[i];
+        //hijo->genes[i] = (i < punto) ? p1->genes[i] : p2->genes[i];
+        hijo->genes.push_back((i < punto) ? p1->genes[i] : p2->genes[i]);
     }
 }
 
@@ -78,7 +87,8 @@ short mutar(Individuo *ind)
     if (rand_float() < MUT_PROB) 
     {
         int pos = rand_int(0, tam - 1);
-        ind->genes[pos] = 1 - ind->genes[pos];
+        //ind->genes[pos] = 1 - ind->genes[pos];
+        ind->genes[pos] = !ind->genes[pos]; 
         return 1;
     }
     else 
@@ -93,7 +103,8 @@ short mutar_r(Individuo *ind, unsigned *semilla)
     if (rand_float_r(semilla) < MUT_PROB) 
     {
         int pos = rand_int_r(0, tam - 1, semilla);
-        ind->genes[pos] = 1 - ind->genes[pos];
+        //ind->genes[pos] = 1 - ind->genes[pos];
+        ind->genes[pos] = !ind->genes[pos]; 
         return 1;
     }
     else 
@@ -184,4 +195,11 @@ void Izhikevich_limitar_parametros(float *b, float *c, float *d, float *I)
 
     if (*d < 0)    *d = 0;
     if (*d > 8)    *d = 8;
+}
+
+void destroy_truck_evaluator() {
+    if (evaluator) {
+        delete evaluator;
+        evaluator = nullptr;
+    }
 }

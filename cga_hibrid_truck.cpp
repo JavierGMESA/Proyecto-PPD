@@ -157,5 +157,7 @@ int main(int argc, char *argv[]) {
     delete[] nueva_poblacion;
 
     MPI_Finalize();
+
+    destroy_truck_evaluator();
     return 0;
 }

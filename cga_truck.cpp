@@ -101,5 +101,7 @@ int main() {
     delete[] poblacion;
     delete[] nueva_poblacion;                       //CAMBIO
 
+    destroy_truck_evaluator();
+
     return 0;
 }

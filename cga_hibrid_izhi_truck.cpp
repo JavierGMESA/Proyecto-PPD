@@ -3,8 +3,8 @@
 #include <time.h>
 #include <omp.h>
 #include "cga_param.h"
-#include "onemax.h"
-#include "onemax_mpi.h"
+#include "truck.hpp"
+#include "truck_mpi.hpp"
 
 //Variables para Izhikevich
 float IniI, IncMutI, IncPosI, IncNegI, IncPicI;
@@ -275,6 +275,8 @@ int main(int argc, char *argv[]) {
     delete[] nueva_poblacion;
 
     MPI_Finalize();
+
+    destroy_truck_evaluator();
 
     return 0;
 }

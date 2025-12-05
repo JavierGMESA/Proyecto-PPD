@@ -122,5 +122,7 @@ int main() {
     delete[] poblacion;
     delete[] nueva_poblacion;
 
+    destroy_truck_evaluator();
+
     return 0;
 }
