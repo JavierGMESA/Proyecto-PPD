@@ -7,7 +7,7 @@ import os
 # -----------------------------
 # Carpetas
 # -----------------------------
-carpeta_imgs = "ImagenesResultado"
+carpeta_imgs = "ImagenesResultadoOnemax"
 os.makedirs(carpeta_imgs, exist_ok=True)
 
 CSV_DIR = "./CSVs"

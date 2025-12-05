@@ -24,7 +24,7 @@ HOSTFILE   = "hosts.txt"
 IFACE      = "tailscale0"
 
 # Carpeta donde se guardan los CSV
-CSV_DIR = "./CSVs"
+CSV_DIR = "./CSVsOnemax"
 os.makedirs(CSV_DIR, exist_ok=True)
 
 # Archivos de mejores parámetros
