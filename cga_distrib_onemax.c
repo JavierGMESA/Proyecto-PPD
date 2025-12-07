@@ -18,7 +18,7 @@ int main(int argc, char *argv[])
     Individuo hijo, mejor_individuo;
     int mejor_fitness_global = 0;
 
-    int myrank, size, tag = 1;
+    int myrank, size;
 
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
@@ -61,7 +61,7 @@ int main(int argc, char *argv[])
     // Bucle principal
     for (int gen = 0; gen < GEN_MAX; gen++) {
         for (i = 0; i < N_ROWS; i++) {
-            for (int j = 0; j < N_COLS; j++) {
+            for (j = 0; j < N_COLS; j++) {
 
                 // Selección de dos padres vecinos
                 vecino_aleatorios(i, j, fc);

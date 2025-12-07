@@ -17,7 +17,7 @@ int main(int argc, char *argv[]) {
     Individuo hijo, mejor_individuo;
     double mejor_fitness_global = 0;
 
-    int myrank, size, tag = 1;
+    int myrank, size;
 
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &myrank);

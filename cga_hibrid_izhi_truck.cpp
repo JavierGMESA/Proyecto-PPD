@@ -64,9 +64,10 @@ int main(int argc, char *argv[]) {
     u = b * v;
     short hay_mutacion, hay_pico;
     long total_picos = 0;
-    int ultimo_pico = 0, picos_seguidos = 0, umbral_f_bajo = 1, umbral_f_alto = 2;
+    int ultimo_pico = 0, picos_seguidos = 0;
+    float umbral_f_bajo = 0.001, umbral_f_alto = 0.08;
 
-    int myrank, size, tag = 1;
+    int myrank, size;
 
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
@@ -98,7 +99,7 @@ int main(int argc, char *argv[]) {
 
     // Inicializar población
     for (i = 0; i < N_ROWS; i++)
-        for (int j = 0; j < N_COLS; j++)
+        for (j = 0; j < N_COLS; j++)
         {
             inicializar_individuo(&poblacion[i][j]);
             if((i == 0 && j == 0) || mejor_fitness_f(evaluar(&poblacion[i][j]), mejor_fitness_global))
@@ -109,20 +110,31 @@ int main(int argc, char *argv[]) {
         }
     
     unsigned seed_array[128];
+    float b_p[128], c_p[128], d_p[128], I_p[128], v_p[128], u_p[128];
+    int ultimo_pico_p[128], picos_seguidos_p[128];
     #pragma omp parallel
     {
         int tid = omp_get_thread_num();
         seed_array[tid] = rand();   // semillas bien separadas
+
+        b_p[tid] = b;
+        c_p[tid] = c;
+        d_p[tid] = d;
+        I_p[tid] = I;
+        ultimo_pico_p[tid] = ultimo_pico;
+        picos_seguidos_p[tid] = picos_seguidos;
+        v_p[tid] = v;
+        u_p[tid] = u;
     }
 
     // Bucle principal
     for (int gen = 0; gen < GEN_MAX; gen++) 
     {
         total_picos = 0;
-        #pragma omp parallel for shared(a, poblacion, nueva_poblacion, mejor_fitness_global) private(i, j, fc, p1, p2, hijo) lastprivate(b, c, d, I, v, u, picos_seguidos, ultimo_pico) default(shared)
+        #pragma omp parallel for shared(a, poblacion, nueva_poblacion, mejor_fitness_global) private(i, j, fc, p1, p2, hijo, hay_pico, hay_mutacion) default(shared)
         for (i = 0; i < N_ROWS; i++) 
         {
-            for (int j = 0; j < N_COLS; j++) 
+            for (j = 0; j < N_COLS; j++) 
             {
                 // CREAR SEMILLA LOCAL PARA rand_r (Crucial para que funcione en paralelo)
                 // Combinamos tiempo, coordenadas e ID del hilo para que sea única
@@ -141,37 +153,37 @@ int main(int argc, char *argv[]) {
 
                 if(hay_mutacion)
                 {
-                    I += IncMutI;
+                    I_p[tid] += IncMutI;
                 }
 
                 hijo.fitness = evaluar(&hijo);
 
                 if(hijo.fitness - poblacion[i][j].fitness < umbral_f_bajo)
                 {
-                    I += IncPosI;
-                    b += IncPosB;
-                    c += IncPosC;
-                    d += IncPosD;
+                    I_p[tid] += IncPosI;
+                    b_p[tid] += IncPosB;
+                    c_p[tid] += IncPosC;
+                    d_p[tid] += IncPosD;
                 }
 
                 if(hijo.fitness - poblacion[i][j].fitness > umbral_f_alto)
                 {
-                    I += IncNegI;
-                    b += IncNegB;
-                    c += IncNegC;
-                    d += IncNegD;
+                    I_p[tid] += IncNegI;
+                    b_p[tid] += IncNegB;
+                    c_p[tid] += IncNegC;
+                    d_p[tid] += IncNegD;
                 }
 
-                Izhikevich_limitar_parametros(&b, &c, &d, &I);
+                Izhikevich_limitar_parametros(&b_p[tid], &c_p[tid], &d_p[tid], &I_p[tid]);
 
 
-                hay_pico = Izhikevich(&v, &u, a, b, c, d, I);
+                hay_pico = Izhikevich(&v_p[tid], &u_p[tid], a, b_p[tid], c_p[tid], d_p[tid], I_p[tid]);
 
                 if(hay_pico)
                 {
                     //printf("Ha habido pico\n");
-                    ultimo_pico = 0;
-                    ++picos_seguidos;
+                    ultimo_pico_p[tid] = 0;
+                    ++picos_seguidos_p[tid];
                     #pragma omp critical
                     {
                         ++total_picos;
@@ -179,32 +191,32 @@ int main(int argc, char *argv[]) {
                 }
                 else 
                 {
-                    if(picos_seguidos > 0)
+                    if(picos_seguidos_p[tid] > 0)
                     {
-                        ++ultimo_pico;
-                        if(ultimo_pico > MAX_ULT_PICO)
+                        ++ultimo_pico_p[tid];
+                        if(ultimo_pico_p[tid] > MAX_ULT_PICO)
                         {
-                            ultimo_pico = 0;
-                            picos_seguidos = 0;
+                            ultimo_pico_p[tid] = 0;
+                            picos_seguidos_p[tid] = 0;
                         }
                     }
                 }
 
-                if(picos_seguidos > MAX_PIC_SEG)
+                if(picos_seguidos_p[tid] > MAX_PIC_SEG)
                 {
-                    I += IncPicI;
-                    b += IncPicB;
-                    c += IncPicC;
-                    d += IncPicD;
-                    --picos_seguidos;
+                    I_p[tid] += IncPicI;
+                    b_p[tid] += IncPicB;
+                    c_p[tid] += IncPicC;
+                    d_p[tid] += IncPicD;
+                    --picos_seguidos_p[tid];
                 }
 
-                Izhikevich_limitar_parametros(&b, &c, &d, &I);
+                Izhikevich_limitar_parametros(&b_p[tid], &c_p[tid], &d_p[tid], &I_p[tid]);
                 // Fuga dependiente del nivel de excitación
-                if (picos_seguidos > 5)
-                    I *= 0.9f;
+                if (picos_seguidos_p[tid] > 5)
+                    I_p[tid] *= 0.9f;
                 else
-                    I *= 0.98f;
+                    I_p[tid] *= 0.98f;
 
                 // Reemplazo elitista
                 if(hay_pico || mejor_fitness_f(hijo.fitness, poblacion[i][j].fitness))
@@ -251,7 +263,7 @@ int main(int argc, char *argv[]) {
         if(myrank == 0)
         {
             printf("Generación %d\t|  Mejor fitness: %f  |  Picos presentados: %ld\n", gen, mejor_fitness_global, total_picos);
-            printf("v: %f  u: %f\n", v, u);
+            printf("v: %f  u: %f\n", v_p[0], u_p[0]);
         }
     }
 

@@ -3,7 +3,7 @@
 #include <time.h>
 #include <omp.h>
 #include "cga_param.h"
-#include "truck.hpp"
+#include "onemax.h"
 
 //Variable para Izhikevich
 float IniI, IncMutI, IncPosI, IncNegI, IncPicI;
@@ -54,12 +54,12 @@ int main(int argc, char *argv[])
 
     srand(time(NULL));
 
+    //Individuo poblacion[N_ROWS][N_COLS];
+    //Individuo nueva_poblacion[N_ROWS][N_COLS];
     Individuo **poblacion, **nueva_poblacion;
     Individuo *p1, *p2;
-    //poblacion = (Individuo**) calloc(N_ROWS, sizeof(Individuo*));
-    //nueva_poblacion = (Individuo**) calloc(N_ROWS, sizeof(Individuo*));
-    poblacion = new Individuo*[N_ROWS];
-    nueva_poblacion = new Individuo*[N_ROWS]; 
+    poblacion = (Individuo**) calloc(N_ROWS, sizeof(Individuo*));
+    nueva_poblacion = (Individuo**) calloc(N_ROWS, sizeof(Individuo*));
     if(!poblacion || !nueva_poblacion)
     {
         printf("Ha habido error en la reserva de memoria");
@@ -69,10 +69,8 @@ int main(int argc, char *argv[])
     int fc[4];
     for(i = 0; i < N_ROWS; ++i)
     {
-        //poblacion[i] = (Individuo*) calloc (N_COLS, sizeof(Individuo));
-        //nueva_poblacion[i] = (Individuo*) calloc (N_COLS, sizeof(Individuo));
-        poblacion[i] = new Individuo[N_COLS];
-        nueva_poblacion[i] = new Individuo[N_COLS]; 
+        poblacion[i] = (Individuo*) calloc (N_COLS, sizeof(Individuo));
+        nueva_poblacion[i] = (Individuo*) calloc (N_COLS, sizeof(Individuo));
         if(!poblacion[i] || !nueva_poblacion[i])
         {
             printf("Ha habido error en la reserva de memoria");
@@ -81,15 +79,14 @@ int main(int argc, char *argv[])
     }
 
     Individuo hijo, mejor_individuo;
-    double mejor_fitness_global = 0;
+    int mejor_fitness_global = 0;
     float v, u;
     float a = IniA, b = IniB, c = IniC, d = IniD, I = IniI;
     v = c;
     u = b * v;
     short hay_mutacion, hay_pico;
     long total_picos = 0;
-    int ultimo_pico = 0, picos_seguidos = 0;
-    float umbral_f_bajo = 0.001, umbral_f_alto = 0.08;
+    int ultimo_pico = 0, picos_seguidos = 0, umbral_f_bajo = 1, umbral_f_alto = 2;
 
     // Inicializar población
     for (i = 0; i < N_ROWS; i++)
@@ -104,21 +101,10 @@ int main(int argc, char *argv[])
         }
 
     unsigned seed_array[128];
-    float b_p[128], c_p[128], d_p[128], I_p[128], v_p[128], u_p[128];
-    int ultimo_pico_p[128], picos_seguidos_p[128];
     #pragma omp parallel
     {
         int tid = omp_get_thread_num();
         seed_array[tid] = rand();   // semillas bien separadas
-
-        b_p[tid] = b;
-        c_p[tid] = c;
-        d_p[tid] = d;
-        I_p[tid] = I;
-        ultimo_pico_p[tid] = ultimo_pico;
-        picos_seguidos_p[tid] = picos_seguidos;
-        v_p[tid] = v;
-        u_p[tid] = u;
     }
             
 
@@ -126,7 +112,7 @@ int main(int argc, char *argv[])
     for (int gen = 0; gen < GEN_MAX; gen++) 
     {
         total_picos = 0;
-        #pragma omp parallel for shared(a, poblacion, nueva_poblacion, mejor_fitness_global) private(i, j, fc, p1, p2, hijo, hay_pico, hay_mutacion) default(shared)
+        #pragma omp parallel for shared(a, poblacion, nueva_poblacion, mejor_fitness_global,) private(i, j, fc, p1, p2, hijo) lastprivate(b, c, d, I, v, u, picos_seguidos, ultimo_pico) default(shared)
         for (i = 0; i < N_ROWS; i++) 
         {
             for (j = 0; j < N_COLS; j++) 
@@ -148,37 +134,37 @@ int main(int argc, char *argv[])
 
                 if(hay_mutacion)
                 {
-                    I_p[tid] += IncMutI;
+                    I += IncMutI;
                 }
 
                 hijo.fitness = evaluar(&hijo);
 
                 if(hijo.fitness - poblacion[i][j].fitness < umbral_f_bajo)
                 {
-                    I_p[tid] += IncPosI;
-                    b_p[tid] += IncPosB;
-                    c_p[tid] += IncPosC;
-                    d_p[tid] += IncPosD;
+                    I += IncPosI;
+                    b += IncPosB;
+                    c += IncPosC;
+                    d += IncPosD;
                 }
 
                 if(hijo.fitness - poblacion[i][j].fitness > umbral_f_alto)
                 {
-                    I_p[tid] += IncNegI;
-                    b_p[tid] += IncNegB;
-                    c_p[tid] += IncNegC;
-                    d_p[tid] += IncNegD;
+                    I += IncNegI;
+                    b += IncNegB;
+                    c += IncNegC;
+                    d += IncNegD;
                 }
 
-                Izhikevich_limitar_parametros(&b_p[tid], &c_p[tid], &d_p[tid], &I_p[tid]);
+                Izhikevich_limitar_parametros(&b, &c, &d, &I);
 
 
-                hay_pico = Izhikevich(&v_p[tid], &u_p[tid], a, b_p[tid], c_p[tid], d_p[tid], I_p[tid]);
+                hay_pico = Izhikevich(&v, &u, a, b, c, d, I);
 
                 if(hay_pico)
                 {
                     //printf("Ha habido pico\n");
-                    ultimo_pico_p[tid] = 0;
-                    ++picos_seguidos_p[tid];
+                    ultimo_pico = 0;
+                    ++picos_seguidos;
                     #pragma omp critical
                     {
                         ++total_picos;
@@ -186,32 +172,32 @@ int main(int argc, char *argv[])
                 }
                 else 
                 {
-                    if(picos_seguidos_p[tid] > 0)
+                    if(picos_seguidos > 0)
                     {
-                        ++ultimo_pico_p[tid];
-                        if(ultimo_pico_p[tid] > MAX_ULT_PICO)
+                        ++ultimo_pico;
+                        if(ultimo_pico > MAX_ULT_PICO)
                         {
-                            ultimo_pico_p[tid] = 0;
-                            picos_seguidos_p[tid] = 0;
+                            ultimo_pico = 0;
+                            picos_seguidos = 0;
                         }
                     }
                 }
 
-                if(picos_seguidos_p[tid] > MAX_PIC_SEG)
+                if(picos_seguidos > MAX_PIC_SEG)
                 {
-                    I_p[tid] += IncPicI;
-                    b_p[tid] += IncPicB;
-                    c_p[tid] += IncPicC;
-                    d_p[tid] += IncPicD;
-                    --picos_seguidos_p[tid];
+                    I += IncPicI;
+                    b += IncPicB;
+                    c += IncPicC;
+                    d += IncPicD;
+                    --picos_seguidos;
                 }
 
-                Izhikevich_limitar_parametros(&b_p[tid], &c_p[tid], &d_p[tid], &I_p[tid]);
+                Izhikevich_limitar_parametros(&b, &c, &d, &I);
                 // Fuga dependiente del nivel de excitación
-                if (picos_seguidos_p[tid] > 5)
-                    I_p[tid] *= 0.9f;
+                if (picos_seguidos > 5)
+                    I *= 0.9f;
                 else
-                    I_p[tid] *= 0.98f;
+                    I *= 0.98f;
 
                 // Reemplazo elitista
                 if(hay_pico || mejor_fitness_f(hijo.fitness, poblacion[i][j].fitness))
@@ -230,31 +216,42 @@ int main(int argc, char *argv[])
                     copiar(&nueva_poblacion[i][j], &poblacion[i][j]);
             }
         }
+        /*
+        b = b / N_ROWS;
+        c = c / N_ROWS;
+        d = d / N_ROWS;
+        I = I / N_ROWS;
+        u = u / N_ROWS;
+        v = v / N_ROWS;
+        */
 
         // Copiar nueva población a actual
         for (int i = 0; i < N_ROWS; i++)
             for (int j = 0; j < N_COLS; j++)
                 copiar(&poblacion[i][j], &nueva_poblacion[i][j]);
 
-        printf("Generación %d\t|  Mejor fitness: %f  |  Picos presentados: %ld\n", gen, mejor_fitness_global, total_picos);
-        printf("v: %f  u: %f\n", v_p[0], u_p[0]);
+        printf("Generación %d\t|  Mejor fitness: %d  |  Picos presentados: %ld\n", gen, mejor_fitness_global, total_picos);
+        printf("v: %f  u: %f\n", v, u);
     }
 
     // Resultado final
     printf("\n=== RESULTADO FINAL ===\n");
-    printf("Mejor fitness encontrado: %f\nMejor fitness posible: %f\n", mejor_fitness_global, 2.0);
+    printf("Mejor fitness encontrado: %d\nMejor fitness posible: %d\n", mejor_fitness_global, L);
+    //printf("Ha habido un total de %ld picos\n", total_picos);
+    /*
+    printf("Mejor individuo: ");
+    for (int i = 0; i < L; i++)
+        printf("%d", mejor_individuo.genes[i]);
+    printf("\n");
+    */
 
     for(i = 0; i < N_ROWS; ++i)
     {
-        //free(poblacion[i]);
-        //free(nueva_poblacion[i]);
-        delete[] poblacion[i];
-        delete[] nueva_poblacion[i];
+        free(poblacion[i]);
+        free(nueva_poblacion[i]);
     }
-    delete[] poblacion;
-    delete[] nueva_poblacion;
-
-    destroy_truck_evaluator();
+    free(poblacion);
+    free(nueva_poblacion);
 
     return 0;
 }

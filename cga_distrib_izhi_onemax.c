@@ -65,7 +65,7 @@ int main(int argc, char *argv[]) {
     long total_picos = 0;
     int ultimo_pico = 0, picos_seguidos = 0, umbral_f_bajo = 1, umbral_f_alto = 2;
 
-    int myrank, size, tag = 1;
+    int myrank, size;
 
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
@@ -112,7 +112,7 @@ int main(int argc, char *argv[]) {
         total_picos = 0;
         for (i = 0; i < N_ROWS; i++) 
         {
-            for (int j = 0; j < N_COLS; j++) 
+            for (j = 0; j < N_COLS; j++) 
             {
 
                 // Selección de dos padres vecinos

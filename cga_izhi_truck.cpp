@@ -87,7 +87,8 @@ int main(int argc, char *argv[]) {
     u = b * v;
     short hay_mutacion, hay_pico;
     long total_picos = 0;
-    int ultimo_pico = 0, picos_seguidos = 0, umbral_f_bajo = 1, umbral_f_alto = 2;
+    int ultimo_pico = 0, picos_seguidos = 0;
+    float umbral_f_bajo = 0.001, umbral_f_alto = 0.08;
 
     // Inicializar población
     for (i = 0; i < N_ROWS; i++)
