@@ -2,6 +2,7 @@
 #define ONEMAX
 
 #include <stdlib.h>
+#include <fstream>
 #include <time.h>
 #include <stdio.h>
 #include <vector>
@@ -10,7 +11,7 @@
 
 typedef struct {
     std::vector<bool> genes;
-    double fitness;
+    double fitness, green_kms, total_emissions;
 } Individuo;
 
 // ----------- FUNCIONES AUXILIARES -----------
@@ -49,11 +50,19 @@ void vecino_aleatorios_r(int fila, int col, int *fc, unsigned *semilla);
 // Comparar fitness
 short mejor_fitness_f(double posible_mejor_fitness, double posible_peor_fitness);
 
+//Comparar kilometros verdes
+short mejor_green_kms_f(double posible_mejor_green_kms, double posible_peor_green_kms);
+
+//Comparar emisiones totales
+short mejor_total_emissions_f(double posible_mejor_total_emissions, double posible_peor_total_emissions);
+
 //Actualizar 'v' y 'u' de Izhikevich
 int Izhikevich(float *v, float *u, float a, float b, float c, float d, float I);
 
 void Izhikevich_limitar_parametros(float *b, float *c, float *d, float *I);
 
 void destroy_truck_evaluator();
+
+void dump_poblacion_truck(const char *filename, int generacion, Individuo **poblacion);
 
 #endif

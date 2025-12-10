@@ -21,7 +21,7 @@ class HybridTruckEvaluator {
 public:
     // Constructor: Carga la ruta automáticamente.
     // El valor por defecto es el que indicaste.
-    HybridTruckEvaluator(std::string filename = "SEG_Cad_Desp_Mad.csv");
+    HybridTruckEvaluator(std::string filename = "SEG_Par_A4_Berlin.csv");
     
     // Destructor
     ~HybridTruckEvaluator();

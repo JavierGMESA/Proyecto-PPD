@@ -7,7 +7,7 @@ static HybridTruckEvaluator* evaluator = nullptr;
 static void init_truck_evaluator() 
 {
     if (!evaluator) {
-        evaluator = new HybridTruckEvaluator("SEG_Cad_Desp_Mad.csv");
+        evaluator = new HybridTruckEvaluator();
     }
 }
 
@@ -38,6 +38,8 @@ double evaluar(Individuo *ind) {
         ind->genes = res.corrected_solution;
         ind->fitness = s;
     }
+    ind->green_kms = res.green_kms;
+    ind->total_emissions = res.total_emissions;
     return s;
 }
 
@@ -54,6 +56,8 @@ void inicializar_individuo(Individuo *ind) {
 void copiar(Individuo *dest, const Individuo *src) {
     dest->genes = src->genes;
     dest->fitness = src->fitness;
+    dest->green_kms = src->green_kms;
+    dest->total_emissions = src->total_emissions;
 }
 
 void crossover_1p(const Individuo *p1, const Individuo *p2, Individuo *hijo) 
@@ -113,10 +117,8 @@ short mutar_r(Individuo *ind, unsigned *semilla)
     }
 }
 
-void vecino_aleatorios(int fila, int col, int *fc) {
-    // fc[0], fc[1] -> primer vecino
-    // fc[2], fc[3] -> segundo vecino
-
+void vecino_aleatorios(int fila, int col, int *fc) 
+{
     // Movimientos posibles (arriba, abajo, izquierda, derecha)
     int df[] = {-1, 1, 0, 0};
     int dc[] = {0, 0, -1, 1};
@@ -134,10 +136,8 @@ void vecino_aleatorios(int fila, int col, int *fc) {
     }
 }
 
-void vecino_aleatorios_r(int fila, int col, int *fc, unsigned *semilla) {
-    // fc[0], fc[1] -> primer vecino
-    // fc[2], fc[3] -> segundo vecino
-
+void vecino_aleatorios_r(int fila, int col, int *fc, unsigned *semilla) 
+{
     // Movimientos posibles (arriba, abajo, izquierda, derecha)
     int df[] = {-1, 1, 0, 0};
     int dc[] = {0, 0, -1, 1};
@@ -158,6 +158,16 @@ void vecino_aleatorios_r(int fila, int col, int *fc, unsigned *semilla) {
 short mejor_fitness_f(double posible_mejor_fitness, double posible_peor_fitness)
 {
     return posible_mejor_fitness > posible_peor_fitness;
+}
+
+short mejor_green_kms_f(double posible_mejor_green_kms, double posible_peor_green_kms)
+{
+    return posible_mejor_green_kms > posible_peor_green_kms;
+}
+
+short mejor_total_emissions_f(double posible_mejor_total_emissions, double posible_peor_total_emissions)
+{
+    return posible_mejor_total_emissions < posible_peor_total_emissions;
 }
 
 int Izhikevich(float *v, float *u, float a, float b, float c, float d, float I)
@@ -201,5 +211,34 @@ void destroy_truck_evaluator() {
     if (evaluator) {
         delete evaluator;
         evaluator = nullptr;
+    }
+}
+
+void dump_poblacion_truck(const char *filename, int generacion, Individuo **poblacion)
+{
+    std::ofstream out(filename);  // modo trunc por defecto
+    if (!out.is_open()) {
+        std::fprintf(stderr, "Error abriendo %s para escribir.\n", filename);
+        return;
+    }
+
+    out << "Generacion " << generacion << "\n";
+    out << "Fila,Col,Fitness,GreenKms,Emissions,Genes\n";
+
+    for (int i = 0; i < N_ROWS; ++i) 
+    {
+        for (int j = 0; j < N_COLS; ++j) 
+        {
+
+            out << i << "," << j << ","
+                << poblacion[i][j].fitness << ","
+                << poblacion[i][j].green_kms << ","
+                << poblacion[i][j].total_emissions << ",";
+
+            for (size_t k = 0; k < poblacion[i][j].genes.size(); ++k) {
+                out << (poblacion[i][j].genes[k] ? '1' : '0');
+            }
+            out << "\n";
+        }
     }
 }

@@ -3,11 +3,11 @@ CC          = gcc
 CXX         = g++
 CC_MPI      = mpicc
 CXX_MPI     = mpic++
-CFLAGS      = -Wall -O2
-CFLAGS_PARAL= -Wall -O2 -fopenmp
-CFLAGS_DISTR= -Wall -O2 -std=c11
-CFLAGS_HIBR = -Wall -O2 -std=c11 -fopenmp
-CXXFLAGS    = -Wall -O2 -std=c++17
+CFLAGS      = -Wall -O3
+CFLAGS_PARAL= -Wall -O3 -fopenmp
+CFLAGS_DISTR= -Wall -O3 -std=c11
+CFLAGS_HIBR = -Wall -O3 -std=c11 -fopenmp
+CXXFLAGS    = -Wall -O3 -std=c++17
 
 TARGETS = cga_onemax cga_izhi_onemax \
           cga_paral_onemax cga_paral_izhi_onemax \

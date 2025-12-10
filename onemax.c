@@ -1,4 +1,5 @@
 #include "onemax.h"
+#include "cga_param.h"
 
 // ----------- FUNCIONES AUXILIARES -----------
 int rand_int(int min, int max) {
@@ -162,4 +163,33 @@ void Izhikevich_limitar_parametros(float *b, float *c, float *d, float *I)
 
     if (*d < 0)    *d = 0;
     if (*d > 8)    *d = 8;
+}
+
+void dump_poblacion_onemax(const char *filename, int generacion, Individuo **poblacion) 
+{
+    FILE *f = fopen(filename, "w");
+    if (!f) 
+    {
+        fprintf(stderr, "Error abriendo %s para escribir.\n", filename);
+        return;
+    }
+
+    fprintf(f, "Generacion %d\n", generacion);
+    fprintf(f, "Fila,Col,Fitness,Genes\n");
+
+    for (int i = 0; i < N_ROWS; ++i) 
+    {
+        for (int j = 0; j < N_COLS; ++j) 
+        {
+
+            fprintf(f, "%d,%d,%d,", i, j, poblacion[i][j].fitness);
+            // genes como cadena 0/1 sin separadores para ahorrar espacio
+            for (int k = 0; k < L; ++k) {
+                fprintf(f, "%d", poblacion[i][j].genes[k]);
+            }
+            fprintf(f, "\n");
+        }
+    }
+
+    fclose(f);
 }

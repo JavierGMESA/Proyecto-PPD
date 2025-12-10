@@ -8,7 +8,18 @@
 
 // ------------------ PROGRAMA PRINCIPAL ------------------
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[]) 
+{
+    if (argc < 3) 
+    {
+        printf("Uso: %s seed numThreads\n", argv[0]);
+        printf("El número de parámetros pasados ha sido: %i", argc);
+        return 1;
+    }
+
+    unsigned int seed = (unsigned int) strtoul(argv[1], NULL, 10);
+    int num_threads   = atoi(argv[2]);
+    omp_set_num_threads(num_threads);
 
     Individuo **poblacion, **nueva_poblacion;
     int i, j;
@@ -17,13 +28,17 @@ int main(int argc, char *argv[]) {
     Individuo hijo, mejor_individuo;
     double mejor_fitness_global = 0;
 
+    double mejor_fitness, peor_fitness, suma_fitness;
+    double mejor_green_kms, peor_green_kms, suma_green_kms;
+    double mejor_emissions, peor_emissions, suma_emissions;
+
     int myrank, size;
 
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    srand(time(NULL) + myrank);
+    srand(seed + myrank);
 
     //poblacion = (Individuo**) calloc(N_ROWS, sizeof(Individuo*));
     //nueva_poblacion = (Individuo**) calloc(N_ROWS, sizeof(Individuo*));
@@ -109,7 +124,7 @@ int main(int argc, char *argv[]) {
 
         //Cada GEN_MAX / 20 generaciones introducimos los mejores individuos de cada isla en nuestra población
         //en posiciones aleatorias.
-        if(gen > 0 && gen % (GEN_MAX / 20) == 0)
+        if((gen > 0 && gen % (GEN_MAX / 20) == 0) || gen == GEN_MAX - 1)
         {
             Individuo* mejores = MPI_Comunicacion(&mejor_individuo, size);
             for(int i2 = 0; i2 < size; ++i2)
@@ -126,6 +141,51 @@ int main(int argc, char *argv[]) {
             delete[]mejores;
         }
 
+        if(myrank == 0)
+        {
+            mejor_green_kms = suma_green_kms = 0.0;
+            peor_green_kms = MAX_GREEN_KMS;
+            mejor_emissions = MAX_TOTAL_EMISIONS;
+            peor_emissions = suma_emissions = 0.0;
+            mejor_fitness = suma_fitness = 0.0;
+            peor_fitness = 2.0;
+            for(i = 0; i < N_ROWS; ++i)
+            {
+                for(j = 0; j < N_COLS; ++j)
+                {
+                    suma_fitness += nueva_poblacion[i][j].fitness;
+                    if(mejor_fitness_f(nueva_poblacion[i][j].fitness, mejor_fitness))
+                    {
+                        mejor_fitness = nueva_poblacion[i][j].fitness;
+                    }
+                    else if(mejor_fitness_f(peor_fitness, nueva_poblacion[i][j].fitness))
+                    {
+                        peor_fitness = nueva_poblacion[i][j].fitness;
+                    }
+
+                    suma_green_kms += nueva_poblacion[i][j].green_kms;
+                    if(mejor_green_kms_f(nueva_poblacion[i][j].green_kms, mejor_green_kms))
+                    {
+                        mejor_green_kms = nueva_poblacion[i][j].green_kms;
+                    }
+                    else if(mejor_green_kms_f(peor_green_kms, nueva_poblacion[i][j].green_kms))
+                    {
+                        peor_green_kms = nueva_poblacion[i][j].green_kms;
+                    }
+
+                    suma_emissions += nueva_poblacion[i][j].total_emissions;
+                    if(mejor_total_emissions_f(nueva_poblacion[i][j].total_emissions, mejor_emissions))
+                    {
+                        mejor_emissions = nueva_poblacion[i][j].total_emissions;
+                    }
+                    else if(mejor_total_emissions_f(peor_emissions, nueva_poblacion[i][j].total_emissions))
+                    {
+                        peor_emissions = nueva_poblacion[i][j].total_emissions;
+                    }
+                }
+            }
+        }
+
         // Copiar nueva población a actual
         for (int i = 0; i < N_ROWS; i++)
             for (int j = 0; j < N_COLS; j++)
@@ -133,7 +193,10 @@ int main(int argc, char *argv[]) {
 
         if(myrank == 0)
         {
-            printf("Generación %d | Mejor fitness: %f\n", gen, mejor_fitness_global);
+            printf("Generación %d\nMejor fitness global: %.6f\n", gen, mejor_fitness_global);
+            printf("Mejor fitness: %.6f | Peor fitness: %.6f | Promedio de fitness: %.6f\n", mejor_fitness, peor_fitness, suma_fitness / (N_ROWS*N_COLS));
+            printf("Mejor green kms: %.6f | Peor green kms: %.6f | Promedio de green kms: %.6f\n", mejor_green_kms, peor_green_kms, suma_green_kms / (N_ROWS*N_COLS));
+            printf("Mejor emissions: %.6f | Peor emissions: %.6f | Promedio de emissions: %.6f\n", mejor_emissions, peor_emissions, suma_emissions / (N_ROWS*N_COLS));
         }
     }
 
@@ -146,8 +209,6 @@ int main(int argc, char *argv[]) {
 
     for(i = 0; i < N_ROWS; ++i)
     {
-        //free(poblacion[i]);
-        //free(nueva_poblacion[i]);
         delete[] poblacion[i];
         delete[] nueva_poblacion[i];
     }
