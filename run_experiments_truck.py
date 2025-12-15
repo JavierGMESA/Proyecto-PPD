@@ -84,6 +84,7 @@ try:
     HAVE_PYRAPL = True
 except Exception:
     HAVE_PYRAPL = False
+    raise ValueError("Falta instalar pyRAPL")
 
 
 def measure_energy_joules(fn):
