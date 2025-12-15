@@ -26,6 +26,23 @@ GEN_COLS = [
     "emis_best","emis_worst","emis_mean",
 ]
 
+
+
+
+# ======= PARCHE TEMPORAL EMISSIONS (escala x100) =======
+FIX_EMISSIONS_SCALE = True  # pon False o comenta este bloque cuando rehagas los CSV
+
+def _fix_emis_mean_scale(df: pd.DataFrame) -> pd.DataFrame:
+    # emis_mean en CSV está /100 -> lo corregimos multiplicando x100
+    if FIX_EMISSIONS_SCALE and "emis_mean" in df.columns:
+        df["emis_mean"] = df["emis_mean"] * 100.0
+    return df
+# =======================================================
+
+
+
+
+
 def _glob_genstats(variant):
     pat = os.path.join(CSV_DIR, f"genstats_{variant}_run*.csv")
     return sorted(glob.glob(pat))
@@ -40,6 +57,10 @@ def load_runs_genstats(variant):
     for f in files:
         try:
             df = pd.read_csv(f)
+
+            # aplicar parche temporal de emisiones
+            df = _fix_emis_mean_scale(df)
+
             # Asegura columnas esperadas si faltan
             for c in GEN_COLS:
                 if c not in df.columns:
