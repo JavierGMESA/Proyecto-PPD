@@ -566,7 +566,7 @@ def main():
             tag = f"{var.label}_t1"
             miss = missing_run_ids(prefix="perf_", target=N_RUNS_PERF, tag=tag)
             for run_id in miss:
-                seed = seeds[run_id - 1]
+                seed = seeds[0]
                 out_csv = os.path.join(CSV_DIR, f"perf_{tag}_run{run_id}.csv")
                 run_one(
                     suite="perf",
@@ -586,7 +586,7 @@ def main():
             tag = f"{var.label}_t{t}"
             miss = missing_run_ids(prefix="perf_", target=N_RUNS_PERF, tag=tag)
             for run_id in miss:
-                seed = seeds[run_id - 1]
+                seed = seeds[0]
                 out_csv = os.path.join(CSV_DIR, f"perf_{tag}_run{run_id}.csv")
                 run_one(
                     suite="perf",
