@@ -27,7 +27,7 @@ os.makedirs(PARAM_DIR, exist_ok=True)
 N_RUNS_MAIN = 5
 N_RUNS_PERF = 3
 
-THREAD_SET = [1, 4, 8, 12, 16, 24, 32]
+THREAD_SET = [1, 2, 4, 6, 8, 12, 16, 24, 32]
 
 # Timeout por ejecución (ajústalo si hace falta)
 TIMEOUT_SEC = 12000
