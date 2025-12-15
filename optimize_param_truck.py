@@ -18,7 +18,7 @@ FINAL_FITNESS_TAGS = [
     "Global best fitness:"
 ]
 
-TIMEOUT_SEC = 600
+TIMEOUT_SEC = 15000
 
 # (Se sobrescribe por len(seeds))
 N_REPS = 3

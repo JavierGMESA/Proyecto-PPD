@@ -30,7 +30,7 @@ N_RUNS_PERF = 3
 THREAD_SET = [1, 4, 8, 12, 16, 24, 32]
 
 # Timeout por ejecución (ajústalo si hace falta)
-TIMEOUT_SEC = 600
+TIMEOUT_SEC = 12000
 
 # MPI config
 N_PROCESOS = 6
