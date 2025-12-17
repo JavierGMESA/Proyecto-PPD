@@ -514,7 +514,7 @@ def main():
     ]
 
     # Semilla fija para perf (como en Truck)
-    seed_perf = seeds_all[0]
+    seed_perf = seeds[0]
 
     # Baselines seq y dist: N_RUNS_PERF runs (threads vacío, pero sufijo _t1)
     for var in perf_variants:
