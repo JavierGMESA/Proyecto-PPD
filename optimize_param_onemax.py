@@ -1,14 +1,14 @@
 import os
 import json
-import time
 import random
 import subprocess
 import numpy as np
 
+
 # =========================
 # CONFIG
 # =========================
-OUTPUT_DIR = "./MejoresParametrosTruck"
+OUTPUT_DIR = "./MejoresParametrosOneMax"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 FINAL_FITNESS_TAGS = [
@@ -20,10 +20,10 @@ FINAL_FITNESS_TAGS = [
 
 TIMEOUT_SEC = 15000
 
-# (Se sobrescribe por len(seeds))
-N_REPS = 3
+# Se sobrescribe por len(seeds)
+N_REPS = 12
 
-WARMUP_RANDOM = 10
+WARMUP_RANDOM = 25
 TOP_FRAC = 0.30
 P_EXPLOIT = 0.70
 P_EXPLORE = 0.30
@@ -33,20 +33,22 @@ N_PROCESOS = 6
 HOSTFILE = "hosts.txt"
 IFACE = "tailscale0"
 
+# Ejecutables OneMax (Izhikevich)
 EXECUTABLES = {
-    1: "./cga_izhi_truck",
-    2: "./cga_paral_izhi_truck",
-    3: "./cga_distrib_izhi_truck",
-    4: "./cga_hibrid_izhi_truck",
+    1: "./cga_izhi_onemax",
+    2: "./cga_paral_izhi_onemax",
+    3: "./cga_distrib_izhi_onemax",
+    4: "./cga_hibrid_izhi_onemax",
 }
 
 BASE_NAMES = {
-    1: "mejores_parametros_izhi_truck",
-    2: "mejores_parametros_paral_izhi_truck",
-    3: "mejores_parametros_distrib_izhi_truck",
-    4: "mejores_parametros_hibrid_izhi_truck",
+    1: "mejores_parametros_izhi_onemax",
+    2: "mejores_parametros_paral_izhi_onemax",
+    3: "mejores_parametros_distrib_izhi_onemax",
+    4: "mejores_parametros_hibrid_izhi_onemax",
 }
 
+# Espacio de parámetros (igual que Truck)
 RANGOS = {
     "IniI": (1, 20),
     "IncMutI": (0.0001, 0.1),
@@ -86,6 +88,7 @@ PARAM_ORDER = [
 
 SEEDS_FILE = "./seeds.txt"
 
+
 # =========================
 # Helpers
 # =========================
@@ -106,8 +109,9 @@ def cargar_seeds(path=SEEDS_FILE):
 
     return seeds
 
+
 def elegir_version():
-    print("¿Qué versión IZHI TRUCK quieres optimizar?")
+    print("¿Qué versión IZHI ONEMAX quieres optimizar?")
     print("  1) Izhikevich secuencial")
     print("  2) Izhikevich OpenMP")
     print("  3) Izhikevich MPI")
@@ -121,17 +125,20 @@ def elegir_version():
             pass
         print("Opción inválida, prueba de nuevo.")
 
+
 def pedir_threads(opcion):
     n_threads = None
     if opcion in (2, 4):
         n_threads = int(input("Número de hilos OpenMP: ").strip())
     return n_threads
 
+
 def rutas_salida(nombre_base):
     return (
         os.path.join(OUTPUT_DIR, nombre_base + ".txt"),
         os.path.join(OUTPUT_DIR, nombre_base + ".json"),
     )
+
 
 def cargar_mejor(nombre_base):
     _, js = rutas_salida(nombre_base)
@@ -144,11 +151,12 @@ def cargar_mejor(nombre_base):
     except Exception:
         return None, None
 
+
 def guardar_mejor(nombre_base, params, best_fit):
     txt, js = rutas_salida(nombre_base)
 
     with open(txt, "w") as f:
-        f.write("=== MEJORES PARAMETROS IZHI TRUCK ===\n\n")
+        f.write("=== MEJORES PARAMETROS IZHI ONEMAX ===\n\n")
         for name in PARAM_ORDER:
             f.write(f"{name} = {params[name]}\n")
         f.write(f"\nFITNESS_GLOBAL_MEJOR = {best_fit}\n")
@@ -156,7 +164,9 @@ def guardar_mejor(nombre_base, params, best_fit):
     with open(js, "w") as f:
         json.dump({"fitness_mejor": best_fit, "parametros": params}, f, indent=4)
 
+
 def parse_fitness_global(output_text):
+    # Busca los tags “fuertes” desde el final del log
     for line in output_text.splitlines()[::-1]:
         for tag in FINAL_FITNESS_TAGS:
             if tag in line:
@@ -165,8 +175,9 @@ def parse_fitness_global(output_text):
                 except Exception:
                     pass
 
+    # Fallback: intenta extraer algún número de una línea típica
     for line in output_text.splitlines()[::-1]:
-        if "Mejor fitness global" in line:
+        if "Mejor fitness" in line:
             parts = line.replace("|", " ").replace(":", " ").split()
             floats = []
             for p in parts:
@@ -176,17 +187,22 @@ def parse_fitness_global(output_text):
                     pass
             if floats:
                 return floats[0]
+
     return None
+
 
 def construir_comando(opcion, exe_path, seed, n_threads, params_dict):
     args_params = [str(params_dict[k]) for k in PARAM_ORDER]
 
+    # 1) Secuencial: ./cga_izhi_onemax seed <20 params>
     if opcion == 1:
         return [exe_path, str(seed)] + args_params
 
+    # 2) OpenMP: ./cga_paral_izhi_onemax seed nthreads <20 params>
     if opcion == 2:
         return [exe_path, str(seed), str(n_threads)] + args_params
 
+    # 3) MPI: mpirun ... ./cga_distrib_izhi_onemax seed <20 params>
     if opcion == 3:
         return [
             "mpirun", "-np", str(N_PROCESOS),
@@ -195,6 +211,7 @@ def construir_comando(opcion, exe_path, seed, n_threads, params_dict):
             exe_path, str(seed)
         ] + args_params
 
+    # 4) Híbrido: mpirun ... ./cga_hibrid_izhi_onemax seed nthreads <20 params>
     return [
         "mpirun", "-np", str(N_PROCESOS),
         "--hostfile", HOSTFILE,
@@ -202,12 +219,13 @@ def construir_comando(opcion, exe_path, seed, n_threads, params_dict):
         exe_path, str(seed), str(n_threads)
     ] + args_params
 
+
 def ejecutar_once(opcion, exe_path, seed, n_threads, params_dict):
     cmd = construir_comando(opcion, exe_path, seed, n_threads, params_dict)
     try:
         out = subprocess.check_output(
             cmd, stderr=subprocess.STDOUT, timeout=TIMEOUT_SEC, text=True
-        )  # check_output lanza CalledProcessError si returncode != 0 [web:45][web:220]
+        )
     except subprocess.TimeoutExpired:
         return None, "timeout"
     except subprocess.CalledProcessError as e:
@@ -215,6 +233,7 @@ def ejecutar_once(opcion, exe_path, seed, n_threads, params_dict):
 
     fit = parse_fitness_global(out)
     return fit, out
+
 
 # =========================
 # Generador "Bayes/TPE-like"
@@ -228,12 +247,14 @@ def random_params():
             p[k] = random.uniform(a, b)
     return p
 
+
 def clip_value(k, v):
     a, b = RANGOS[k]
     if k.startswith("MAX") or k in ("IniI", "IniD"):
         v = int(round(v))
         return max(int(a), min(int(b), v))
     return max(a, min(b, float(v)))
+
 
 def propose_params(history):
     if len(history) < WARMUP_RANDOM:
@@ -258,6 +279,7 @@ def propose_params(history):
         newp[k] = clip_value(k, sample)
 
     return newp
+
 
 # =========================
 # MAIN
@@ -284,7 +306,7 @@ if __name__ == "__main__":
     history = []
     iteracion = 0
 
-    print(f"\nOptimización IZHI TRUCK -> {exe_path}")
+    print(f"\nOptimización IZHI ONEMAX -> {exe_path}")
     print(f"Seeds: {seeds}  (N_REPS={N_REPS})")
     if n_threads is not None:
         print(f"OpenMP threads: {n_threads}")
@@ -329,7 +351,7 @@ if __name__ == "__main__":
             if score > best_fit:
                 best_fit = score
                 best_params = params
-                print(f"🎉 NUEVO MEJOR (Truck) -> {best_fit:.6f}")
+                print(f"🎉 NUEVO MEJOR (OneMax) -> {best_fit:.6f}")
                 guardar_mejor(nombre_base, best_params, best_fit)
 
     except KeyboardInterrupt:
@@ -337,5 +359,3 @@ if __name__ == "__main__":
         if best_params is not None:
             guardar_mejor(nombre_base, best_params, best_fit)
             print("✅ Mejor guardado.")
-
-
