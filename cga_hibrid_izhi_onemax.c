@@ -18,14 +18,18 @@ int MAX_ULT_PICO, MAX_PIC_SEG;
 
 int main(int argc, char *argv[]) {
 
-    if (argc != 21) 
+    if (argc != 23) 
     {
-        printf("Uso: %s IniI IncMutI IncPosI IncNegI IncPicI IniA IniB IncPosB IncNegB IncPicB IniC IncPosC IncNegC IncPicC IniD IncPosD IncNegD IncPicD MAX_ULT_PICO MAX_PIC_SEG\n", argv[0]);
+        printf("Uso: %s seed numThreads IniI IncMutI IncPosI IncNegI IncPicI IniA IniB IncPosB IncNegB IncPicB IniC IncPosC IncNegC IncPicC IniD IncPosD IncNegD IncPicD MAX_ULT_PICO MAX_PIC_SEG\n", argv[0]);
         printf("El número de parámetros pasados ha sido: %i", argc);
         return 1;
     }
 
-    int idx = 1;
+    unsigned int seed = (unsigned int) strtoul(argv[1], NULL, 10);
+    int num_threads   = atoi(argv[2]);
+    omp_set_num_threads(num_threads);
+
+    int idx = 3;
     IniI     = atof(argv[idx++]);
     IncMutI  = atof(argv[idx++]);
     IncPosI  = atof(argv[idx++]);
@@ -56,6 +60,9 @@ int main(int argc, char *argv[]) {
     Individuo hijo, mejor_individuo;
     Individuo *p1, *p2;
     int mejor_fitness_global = 0;
+
+    int mejor_fitness, peor_fitness, suma_fitness;
+
     int i, j;
     int fc[4];
     float v, u;
@@ -72,10 +79,8 @@ int main(int argc, char *argv[]) {
     MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    srand(time(NULL) + myrank);
+    srand(seed + myrank);
 
-    //Individuo poblacion[N_ROWS][N_COLS];
-    //Individuo nueva_poblacion[N_ROWS][N_COLS];
     poblacion = (Individuo**) calloc(N_ROWS, sizeof(Individuo*));
     nueva_poblacion = (Individuo**) calloc(N_ROWS, sizeof(Individuo*));
     if(!poblacion || !nueva_poblacion)
@@ -96,7 +101,7 @@ int main(int argc, char *argv[]) {
 
     // Inicializar población
     for (i = 0; i < N_ROWS; i++)
-        for (int j = 0; j < N_COLS; j++)
+        for (j = 0; j < N_COLS; j++)
         {
             inicializar_individuo(&poblacion[i][j]);
             if((i == 0 && j == 0) || mejor_fitness_f(evaluar(&poblacion[i][j]), mejor_fitness_global))
@@ -252,6 +257,27 @@ int main(int argc, char *argv[]) {
             free(mejores);
         }
 
+        if(myrank == 0)
+        {
+            mejor_fitness = suma_fitness = 0;
+            peor_fitness = L;
+            for(i = 0; i < N_ROWS; ++i)
+            {
+                for(j = 0; j < N_COLS; ++j)
+                {
+                    suma_fitness += nueva_poblacion[i][j].fitness;
+                    if(mejor_fitness_f(nueva_poblacion[i][j].fitness, mejor_fitness))
+                    {
+                        mejor_fitness = nueva_poblacion[i][j].fitness;
+                    }
+                    else if(mejor_fitness_f(peor_fitness, nueva_poblacion[i][j].fitness))
+                    {
+                        peor_fitness = nueva_poblacion[i][j].fitness;
+                    }
+                }
+            }
+        }
+
         // Copiar nueva población a actual
         for (int i = 0; i < N_ROWS; i++)
             for (int j = 0; j < N_COLS; j++)
@@ -259,8 +285,8 @@ int main(int argc, char *argv[]) {
 
         if(myrank == 0)
         {
-            printf("Generación %d\t|  Mejor fitness: %d  |  Picos presentados: %ld\n", gen, mejor_fitness_global, total_picos);
-            printf("v: %f  u: %f\n", v_p[0], u_p[0]);
+            printf("Generación %d\nMejor fitness global: %d\n", gen, mejor_fitness_global);
+            printf("Mejor fitness: %d | Peor fitness: %d | Promedio de fitness: %d\n", mejor_fitness, peor_fitness, suma_fitness / (N_ROWS*N_COLS));
         }
     }
 

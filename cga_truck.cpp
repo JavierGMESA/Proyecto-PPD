@@ -48,7 +48,7 @@ int main(int argc, char *argv[]) {
 
     // Inicializar población
     for (i = 0; i < N_ROWS; i++)
-        for (int j = 0; j < N_COLS; j++)
+        for (j = 0; j < N_COLS; j++)
         {
             inicializar_individuo(&poblacion[i][j]);
             if((i == 0 && j == 0) || mejor_fitness_f(evaluar(&poblacion[i][j]), mejor_fitness_global))

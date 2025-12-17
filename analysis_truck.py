@@ -391,33 +391,63 @@ def plot_main_consumption_by_variant():
     df = load_runs_summary()
     if df is None or df.empty:
         return
+
     d = df[df["suite"] == "main"].copy()
     if d.empty:
         return
 
-    grp = d.groupby("variant")[["avg_power_w","energy_j","wall_time_s"]].mean(numeric_only=True)
-    order = [v for v in VARIANTS_ALL if v in grp.index]
-    grp = grp.loc[order]
+    # Excluir MPI e híbrido (consumo parcial: solo 1 nodo)
+    d = d[~d["variant"].str.contains(r"(_dist|_hibr)$", na=False)].copy()
 
-    if "avg_power_w" in grp.columns and not grp["avg_power_w"].isna().all():
-        fig, ax = plt.subplots(figsize=(10,5))
-        ax.bar(grp.index, grp["avg_power_w"].values)
-        ax.set_title("Truck (suite main): consumo medio por versión (potencia media)")
+    if d.empty:
+        print("Aviso: tras filtrar dist/hibr no quedan filas suite=main.")
+        return
+
+    # Orden coherente (solo sec/OMP)
+    order = [v for v in VARIANTS_ALL if v in d["variant"].unique() and not (v.endswith("_dist") or v.endswith("_hibr"))]
+
+    def _boxplot_metric(metric_col: str, title: str, ylabel: str, out_png: str):
+        series = []
+        labels = []
+        for v in order:
+            vals = pd.to_numeric(d.loc[d["variant"] == v, metric_col], errors="coerce").dropna().values
+            if vals.size == 0:
+                continue
+            series.append(vals)
+            labels.append(v)
+
+        if not series:
+            print(f"Aviso: no hay datos válidos en {metric_col} para suite=main (sec/OMP).")
+            return
+
+        fig, ax = plt.subplots(figsize=(11, 5))
+        ax.boxplot(series, tick_labels=labels)  # tick_labels (no labels) [web:153]
+        ax.set_title(title)
         ax.set_xlabel("Versión")
-        ax.set_ylabel("Potencia (W)")
+        ax.set_ylabel(ylabel)
         ax.tick_params(axis="x", rotation=35)
         ax.grid(True, axis="y")
-        plot_save(fig, "truck_main_power_by_version.png")
+        plot_save(fig, out_png)
 
-    if "energy_j" in grp.columns and not grp["energy_j"].isna().all():
-        fig, ax = plt.subplots(figsize=(10,5))
-        ax.bar(grp.index, grp["energy_j"].values)
-        ax.set_title("Truck (suite main): energía media por versión")
-        ax.set_xlabel("Versión")
-        ax.set_ylabel("Energía (J)")
-        ax.tick_params(axis="x", rotation=35)
-        ax.grid(True, axis="y")
-        plot_save(fig, "truck_main_energy_by_version.png")
+    # Potencia (W)
+    if "avg_power_w" in d.columns:
+        _boxplot_metric(
+            "avg_power_w",
+            "Truck (suite main): potencia (boxplot) solo sec/OMP",
+            "Potencia (W)",
+            "truck_main_power_boxplot_sec_omp.png"
+        )
+
+    # Energía (J)
+    if "energy_j" in d.columns:
+        _boxplot_metric(
+            "energy_j",
+            "Truck (suite main): energía (boxplot) solo sec/OMP",
+            "Energía (J)",
+            "truck_main_energy_boxplot_sec_omp.png"
+        )
+
+
 
 
 def main():
@@ -439,4 +469,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 

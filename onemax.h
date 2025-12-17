@@ -4,10 +4,12 @@
 #include <stdlib.h>
 #include <time.h>
 #include <stdio.h>
+#include <stdint.h>
 #include "cga_param.h"
 
-typedef struct {
-    int genes[L];
+typedef struct 
+{
+    uint8_t genes[L];
     int fitness;
 } Individuo;
 

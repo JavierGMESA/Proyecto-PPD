@@ -16,14 +16,17 @@ int MAX_ULT_PICO, MAX_PIC_SEG;
 
 int main(int argc, char *argv[]) {
 
-    if (argc != 21) 
+    if (argc != 22) 
     {
-        printf("Uso: %s IniI IncMutI IncPosI IncNegI IncPicI IniA IniB IncPosB IncNegB IncPicB IniC IncPosC IncNegC IncPicC IniD IncPosD IncNegD IncPicD MAX_ULT_PICO MAX_PIC_SEG\n", argv[0]);
+        printf("Uso: %s seed IniI IncMutI IncPosI IncNegI IncPicI IniA IniB IncPosB IncNegB IncPicB IniC IncPosC IncNegC IncPicC IniD IncPosD IncNegD IncPicD MAX_ULT_PICO MAX_PIC_SEG\n", argv[0]);
         printf("El número de parámetros pasados ha sido: %i", argc);
         return 1;
     }
 
-    int idx = 1;
+    unsigned int seed = (unsigned int) strtoul(argv[1], NULL, 10);
+    srand(seed);
+
+    int idx = 2;
     IniI     = atof(argv[idx++]);
     IncMutI  = atof(argv[idx++]);
     IncPosI  = atof(argv[idx++]);
@@ -50,11 +53,6 @@ int main(int argc, char *argv[]) {
     MAX_ULT_PICO = atoi(argv[idx++]);
     MAX_PIC_SEG  = atoi(argv[idx++]);
 
-
-    srand(time(NULL));
-
-    //Individuo poblacion[N_ROWS][N_COLS];
-    //Individuo nueva_poblacion[N_ROWS][N_COLS];
     Individuo **poblacion, **nueva_poblacion;
     poblacion = (Individuo**) calloc(N_ROWS, sizeof(Individuo*));
     nueva_poblacion = (Individuo**) calloc(N_ROWS, sizeof(Individuo*));
@@ -63,7 +61,7 @@ int main(int argc, char *argv[]) {
         printf("Ha habido error en la reserva de memoria");
         return 1;
     }
-    int i;
+    int i, j;
     for(i = 0; i < N_ROWS; ++i)
     {
         poblacion[i] = (Individuo*) calloc (N_COLS, sizeof(Individuo));
@@ -77,6 +75,9 @@ int main(int argc, char *argv[]) {
 
     Individuo hijo, mejor_individuo;
     int mejor_fitness_global = 0;
+
+    int mejor_fitness, peor_fitness, suma_fitness;
+
     float v, u;
     float a = IniA, b = IniB, c = IniC, d = IniD, I = IniI;
     v = c;
@@ -87,7 +88,7 @@ int main(int argc, char *argv[]) {
 
     // Inicializar población
     for (i = 0; i < N_ROWS; i++)
-        for (int j = 0; j < N_COLS; j++)
+        for (j = 0; j < N_COLS; j++)
         {
             inicializar_individuo(&poblacion[i][j]);
             if((i == 0 && j == 0) || mejor_fitness_f(evaluar(&poblacion[i][j]), mejor_fitness_global))
@@ -104,7 +105,7 @@ int main(int argc, char *argv[]) {
         total_picos = 0;
         for (i = 0; i < N_ROWS; i++) 
         {
-            for (int j = 0; j < N_COLS; j++) 
+            for (j = 0; j < N_COLS; j++) 
             {
 
                 // Selección de dos padres vecinos
@@ -196,13 +197,31 @@ int main(int argc, char *argv[]) {
             }
         }
 
+        mejor_fitness = suma_fitness = 0;
+        peor_fitness = L;
+        for(i = 0; i < N_ROWS; ++i)
+        {
+            for(j = 0; j < N_COLS; ++j)
+            {
+                suma_fitness += nueva_poblacion[i][j].fitness;
+                if(mejor_fitness_f(nueva_poblacion[i][j].fitness, mejor_fitness))
+                {
+                    mejor_fitness = nueva_poblacion[i][j].fitness;
+                }
+                else if(mejor_fitness_f(peor_fitness, nueva_poblacion[i][j].fitness))
+                {
+                    peor_fitness = nueva_poblacion[i][j].fitness;
+                }
+            }
+        }
+
         // Copiar nueva población a actual
         for (int i = 0; i < N_ROWS; i++)
             for (int j = 0; j < N_COLS; j++)
                 copiar(&poblacion[i][j], &nueva_poblacion[i][j]);
 
-        printf("Generación %d\t|  Mejor fitness: %d  |  Picos presentados: %ld\n", gen, mejor_fitness_global, total_picos);
-        printf("v: %f  u: %f\n", v, u);
+        printf("Generación %d\nMejor fitness global: %d\n", gen, mejor_fitness_global);
+        printf("Mejor fitness: %d | Peor fitness: %d | Promedio de fitness: %d\n", mejor_fitness, peor_fitness, suma_fitness / (N_ROWS*N_COLS));
     }
 
     // Resultado final

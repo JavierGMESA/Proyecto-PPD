@@ -23,7 +23,7 @@ float rand_float();
 
 float rand_float_r(unsigned *semilla);
 
-// Evaluar OneMax
+// Evaluar Truck
 double evaluar(Individuo *ind);
 
 // Inicializar individuo aleatorio
