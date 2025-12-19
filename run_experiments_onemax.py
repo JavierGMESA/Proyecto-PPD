@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import Optional, List, Dict, Tuple
 from itertools import cycle, islice
 
+
 # ============================================================
 # CONFIG (OneMax)
 # ============================================================
@@ -37,10 +38,11 @@ HOSTFILE = "hosts.txt"
 IFACE = "tailscale0"
 
 # OpenMP runtime hints (para evitar spin-wait en híbrido/oversubscription)
-OMP_WAIT_POLICY = "PASSIVE"     # ACTIVE|PASSIVE [web:460]
-OMP_PROC_BIND   = "true"        # true/false/master/close/spread [web:414]
-OMP_PLACES      = "cores"       # threads/cores/sockets o lista explícita [web:480]
+OMP_WAIT_POLICY = "PASSIVE"     # ACTIVE|PASSIVE
+OMP_PROC_BIND   = "true"        # true/false/master/close/spread
+OMP_PLACES      = "cores"       # threads/cores/sockets o lista explícita
 OMP_DYNAMIC     = "false"
+
 
 # Binarios OneMax
 EXEC_OM_ELITE_SEQ   = "./cga_onemax"
@@ -52,6 +54,7 @@ EXEC_OM_IZHI_DIST   = "./cga_distrib_izhi_onemax"
 EXEC_OM_ELITE_HIBR  = "./cga_hibrid_onemax"
 EXEC_OM_IZHI_HIBR   = "./cga_hibrid_izhi_onemax"
 
+
 # Base names EXACTOS como en optimize_param_onemax.py
 BASE_NAMES = {
     "izhi_seq":   "mejores_parametros_izhi_onemax",
@@ -59,6 +62,7 @@ BASE_NAMES = {
     "izhi_dist":  "mejores_parametros_distrib_izhi_onemax",
     "izhi_hibr":  "mejores_parametros_hibrid_izhi_onemax",
 }
+
 
 # Orden parámetros Izhi
 PARAM_ORDER = [
@@ -70,12 +74,14 @@ PARAM_ORDER = [
     "MAX_ULT_PICO", "MAX_PIC_SEG"
 ]
 
+
 FINAL_FITNESS_TAGS = [
     "Mejor fitness global:",
     "Mejor fitness encontrado:",
     "Best global fitness:",
     "Global best fitness:"
 ]
+
 
 # ============================================================
 # (Opcional) Energía con pyRAPL
@@ -90,6 +96,7 @@ except Exception:
     HAVE_PYRAPL = False
     # Si prefieres no abortar, comenta el raise y deja la energía vacía.
     raise ValueError("Falta instalar pyRAPL")
+
 
 def measure_energy_joules(fn):
     """Devuelve (energy_j, result_dict). energy_j=None si no hay pyRAPL."""
@@ -110,6 +117,7 @@ def measure_energy_joules(fn):
 
     return energy_j, result
 
+
 # ============================================================
 # Parseo stdout -> filas por generación (OneMax)
 # ============================================================
@@ -119,6 +127,7 @@ RE_GLOBAL = re.compile(r"Mejor fitness global:\s*([-\d\.eE]+)\s*$")
 RE_FIT = re.compile(
     r"Mejor fitness:\s*([-\d\.eE]+)\s*\|\s*Peor fitness:\s*([-\d\.eE]+)\s*\|\s*Promedio de fitness:\s*([-\d\.eE]+)\s*$"
 )
+
 
 def parse_fitness_global_final(output_text: str) -> Optional[float]:
     for line in output_text.splitlines()[::-1]:
@@ -141,6 +150,7 @@ def parse_fitness_global_final(output_text: str) -> Optional[float]:
             if floats:
                 return floats[0]
     return None
+
 
 def parse_generation_rows(output_text: str, seed: int, threads: Optional[int]) -> List[Dict]:
     rows: List[Dict] = []
@@ -173,12 +183,12 @@ def parse_generation_rows(output_text: str, seed: int, threads: Optional[int]) -
             cur["fit_best"] = float(m.group(1))
             cur["fit_worst"] = float(m.group(2))
             cur["fit_mean"] = float(m.group(3))
-            # En OneMax el bloque acaba aquí -> guardamos fila
             rows.append(cur)
             cur = None
             continue
 
     return rows
+
 
 GEN_COLS = [
     "gen", "seed", "threads",
@@ -186,12 +196,14 @@ GEN_COLS = [
     "fit_best", "fit_worst", "fit_mean",
 ]
 
+
 RUN_SUMMARY_FILE = os.path.join(CSV_DIR, "runs_summary.csv")
 RUN_SUMMARY_COLS = [
     "suite", "variant", "kind", "threads", "run_id", "seed",
     "wall_time_s", "energy_j", "avg_power_w",
     "final_best_global", "return_code"
 ]
+
 
 # ============================================================
 # Helpers: seeds, params, incremental
@@ -211,9 +223,11 @@ def read_seeds(path: str) -> List[int]:
         raise ValueError("seeds.txt está vacío")
     return seeds
 
+
 def seeds_for_n_runs(seeds_all: List[int], n: int) -> List[int]:
     """Devuelve exactamente n seeds; si faltan, repite cíclicamente."""
     return list(islice(cycle(seeds_all), n))
+
 
 def check_exec(path: str) -> bool:
     ok = os.path.exists(path)
@@ -221,10 +235,12 @@ def check_exec(path: str) -> bool:
         print(f"❌ No existe el ejecutable: {path}")
     return ok
 
+
 def ensure_summary_header():
     if not os.path.exists(RUN_SUMMARY_FILE):
         with open(RUN_SUMMARY_FILE, "w", newline="", encoding="utf-8") as f:
             csv.writer(f).writerow(RUN_SUMMARY_COLS)
+
 
 def existing_run_ids(pattern_glob: str) -> List[int]:
     out: List[int] = []
@@ -234,10 +250,12 @@ def existing_run_ids(pattern_glob: str) -> List[int]:
             out.append(int(m.group(1)))
     return sorted(set(out))
 
+
 def missing_run_ids(prefix: str, target: int, tag: str) -> List[int]:
     pattern = os.path.join(CSV_DIR, f"{prefix}{tag}_run*.csv")
     have = set(existing_run_ids(pattern))
     return [k for k in range(1, target + 1) if k not in have]
+
 
 def load_izhi_params_for(key: str) -> Optional[List[str]]:
     base = BASE_NAMES[key]
@@ -283,6 +301,7 @@ def load_izhi_params_for(key: str) -> Optional[List[str]]:
 
     return None
 
+
 # ============================================================
 # Construcción de comandos
 # ============================================================
@@ -293,6 +312,7 @@ class Variant:
     exe: str
     kind: str  # seq, omp, mpi, hybrid
     izhi_key: Optional[str] = None  # izhi_seq, izhi_paral, izhi_dist, izhi_hibr
+
 
 def build_cmd(
     var: Variant,
@@ -308,7 +328,7 @@ def build_cmd(
             raise ValueError(f"{var.label} requiere threads")
         args.append(str(threads))
 
-        # Variables OpenMP para el runtime
+        # Variables OpenMP para el runtime (siempre las ponemos en env del proceso)
         env_extra["OMP_NUM_THREADS"] = str(threads)
         env_extra["OMP_DYNAMIC"] = OMP_DYNAMIC
         env_extra["OMP_WAIT_POLICY"] = OMP_WAIT_POLICY
@@ -323,14 +343,30 @@ def build_cmd(
     if var.kind in ("seq", "omp"):
         return [var.exe] + args, env_extra
 
+    # --------------------------------------------------------
+    # FIX: exportar explícitamente OMP_* a los ranks (Open MPI)
+    # Usar -x VAR o -x VAR=VAL; se aplica a MPI e híbrido. [web:543]
+    # --------------------------------------------------------
     mpicmd = [
         "mpirun",
         "-np", str(N_PROCESOS),
         "--hostfile", HOSTFILE,
         "--mca", "btl_tcp_if_include", IFACE,
-        var.exe
-    ] + args
+    ]
+
+    # Para híbrido: definir y exportar valores concretos a todos los ranks
+    if var.kind == "hybrid":
+        mpicmd += [
+            "-x", f"OMP_NUM_THREADS={env_extra['OMP_NUM_THREADS']}",
+            "-x", f"OMP_DYNAMIC={OMP_DYNAMIC}",
+            "-x", f"OMP_WAIT_POLICY={OMP_WAIT_POLICY}",
+            "-x", f"OMP_PROC_BIND={OMP_PROC_BIND}",
+            "-x", f"OMP_PLACES={OMP_PLACES}",
+        ]
+
+    mpicmd += [var.exe] + args
     return mpicmd, env_extra
+
 
 # ============================================================
 # Ejecución
@@ -404,6 +440,7 @@ def run_one(
         print(f"  ⚠️ return_code={rc} (revisa runs_summary.csv)")
     print(f"  ✅ CSV: {out_csv_path} | wall={wall_s:.2f}s | energy_j={energy_j}")
 
+
 def ask_yes_no(prompt: str, default: str = "n") -> bool:
     default = default.lower().strip()
     while True:
@@ -415,10 +452,12 @@ def ask_yes_no(prompt: str, default: str = "n") -> bool:
         if ans in ("n", "no"):
             return False
 
+
 def delete_csvs():
     for p in glob.glob(os.path.join(CSV_DIR, "*.csv")):
         os.remove(p)
     print(f"🧹 CSVs eliminados en {CSV_DIR}")
+
 
 def main():
     print("=" * 70)
@@ -447,7 +486,6 @@ def main():
     seeds = read_seeds(SEEDS_FILE)
     if len(seeds) < max(N_RUNS_MAIN, N_RUNS_PERF):
         raise ValueError(f"{SEEDS_FILE} debe tener al menos {max(N_RUNS_MAIN, N_RUNS_PERF)} seeds.")
-
 
     # 3) Cargar params Izhi (4 variantes)
     izhi_args = {
@@ -570,6 +608,7 @@ def main():
     if not HAVE_PYRAPL:
         print("ℹ️ pyRAPL no está disponible; energía/potencia quedarán vacías (solo tiempos).")
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

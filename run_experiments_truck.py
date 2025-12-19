@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+
 import os
 import re
 import csv
@@ -11,37 +12,46 @@ import subprocess
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Tuple
 
+
 # ============================================================
 # CONFIG (según tu proyecto)
 # ============================================================
+
 
 # Directorios reales del proyecto (según capturas)
 CSV_DIR = "./CSVsTruck"
 PARAM_DIR = "./MejoresParametrosTruck"
 SEEDS_FILE = "./seeds.txt"
 
+
 os.makedirs(CSV_DIR, exist_ok=True)
 os.makedirs(PARAM_DIR, exist_ok=True)
+
 
 # Runs
 N_RUNS_MAIN = 5
 N_RUNS_PERF = 3
 
+
 THREAD_SET = [1, 2, 4, 6, 8, 12, 16, 24, 32]
+
 
 # Timeout por ejecución (ajústalo si hace falta)
 TIMEOUT_SEC = 12000
+
 
 # MPI config
 N_PROCESOS = 6
 HOSTFILE = "hosts.txt"
 IFACE = "tailscale0"
 
+
 # OpenMP runtime hints (para evitar spin-wait en híbrido/oversubscription)
-OMP_WAIT_POLICY = "PASSIVE"     # ACTIVE|PASSIVE [web:460]
-OMP_PROC_BIND   = "true"        # true/false/master/close/spread [web:414]
-OMP_PLACES      = "cores"       # threads/cores/sockets o lista explícita [web:480]
+OMP_WAIT_POLICY = "PASSIVE"     # ACTIVE|PASSIVE
+OMP_PROC_BIND   = "true"        # true/false/master/close/spread
+OMP_PLACES      = "cores"       # threads/cores/sockets o lista explícita
 OMP_DYNAMIC     = "false"
+
 
 # Binarios (tal como indicaste)
 EXEC_TRUCK_ELITE_SEQ   = "./cga_truck"
@@ -53,6 +63,7 @@ EXEC_TRUCK_IZHI_DIST   = "./cga_distrib_izhi_truck"
 EXEC_TRUCK_ELITE_HIBR  = "./cga_hibrid_truck"
 EXEC_TRUCK_IZHI_HIBR   = "./cga_hibrid_izhi_truck"
 
+
 # Base names EXACTOS como en optimize_param_truck.py
 BASE_NAMES = {
     "izhi_seq":   "mejores_parametros_izhi_truck",
@@ -60,6 +71,7 @@ BASE_NAMES = {
     "izhi_dist":  "mejores_parametros_distrib_izhi_truck",
     "izhi_hibr":  "mejores_parametros_hibrid_izhi_truck",
 }
+
 
 # Orden parámetros Izhi (igual que optimize_param_truck.py)
 PARAM_ORDER = [
@@ -71,6 +83,7 @@ PARAM_ORDER = [
     "MAX_ULT_PICO", "MAX_PIC_SEG"
 ]
 
+
 # Tags para extraer fitness global final (mismo criterio que optimize)
 FINAL_FITNESS_TAGS = [
     "Mejor fitness global:",
@@ -79,9 +92,11 @@ FINAL_FITNESS_TAGS = [
     "Global best fitness:"
 ]
 
+
 # ============================================================
 # (Opcional) Energía con pyRAPL
 # ============================================================
+
 
 HAVE_PYRAPL = False
 try:
@@ -91,6 +106,7 @@ try:
 except Exception:
     HAVE_PYRAPL = False
     raise ValueError("Falta instalar pyRAPL")
+
 
 
 def measure_energy_joules(fn):
@@ -114,9 +130,11 @@ def measure_energy_joules(fn):
     return energy_j, result
 
 
+
 # ============================================================
 # Parseo stdout -> filas por generación (según tu printf)
 # ============================================================
+
 
 RE_GEN = re.compile(r"^\s*Generación\s+(\d+)\s*$")
 RE_GLOBAL = re.compile(
@@ -131,6 +149,7 @@ RE_GREEN = re.compile(
 RE_EMIS = re.compile(
     r"Mejor emissions:\s*([-\d\.eE]+)\s*\|\s*Peor emissions:\s*([-\d\.eE]+)\s*\|\s*Promedio de emissions:\s*([-\d\.eE]+)"
 )
+
 
 
 def parse_fitness_global_final(output_text: str) -> Optional[float]:
@@ -156,6 +175,7 @@ def parse_fitness_global_final(output_text: str) -> Optional[float]:
             if floats:
                 return floats[0]
     return None
+
 
 
 def parse_generation_rows(output_text: str, seed: int, threads: Optional[int]) -> List[Dict]:
@@ -222,6 +242,7 @@ def parse_generation_rows(output_text: str, seed: int, threads: Optional[int]) -
     return rows
 
 
+
 GEN_COLS = [
     "gen", "seed", "threads",
     "best_global", "picos",
@@ -229,6 +250,7 @@ GEN_COLS = [
     "green_best", "green_worst", "green_mean",
     "emis_best", "emis_worst", "emis_mean",
 ]
+
 
 RUN_SUMMARY_FILE = os.path.join(CSV_DIR, "runs_summary.csv")
 RUN_SUMMARY_COLS = [
@@ -238,9 +260,11 @@ RUN_SUMMARY_COLS = [
 ]
 
 
+
 # ============================================================
 # Helpers: seeds, params, incremental
 # ============================================================
+
 
 def read_seeds(path: str) -> List[int]:
     if not os.path.exists(path):
@@ -257,6 +281,7 @@ def read_seeds(path: str) -> List[int]:
     return seeds
 
 
+
 def check_exec(path: str) -> bool:
     ok = os.path.exists(path)
     if not ok:
@@ -264,10 +289,12 @@ def check_exec(path: str) -> bool:
     return ok
 
 
+
 def ensure_summary_header():
     if not os.path.exists(RUN_SUMMARY_FILE):
         with open(RUN_SUMMARY_FILE, "w", newline="", encoding="utf-8") as f:
             csv.writer(f).writerow(RUN_SUMMARY_COLS)
+
 
 
 def existing_run_ids(pattern_glob: str) -> List[int]:
@@ -279,10 +306,12 @@ def existing_run_ids(pattern_glob: str) -> List[int]:
     return sorted(set(out))
 
 
+
 def missing_run_ids(prefix: str, target: int, tag: str) -> List[int]:
     pattern = os.path.join(CSV_DIR, f"{prefix}{tag}_run*.csv")
     have = set(existing_run_ids(pattern))
     return [k for k in range(1, target + 1) if k not in have]
+
 
 
 def load_izhi_params_for(key: str) -> Optional[List[str]]:
@@ -330,9 +359,11 @@ def load_izhi_params_for(key: str) -> Optional[List[str]]:
     return None
 
 
+
 # ============================================================
 # Construcción de comandos
 # ============================================================
+
 
 @dataclass(frozen=True)
 class Variant:
@@ -342,21 +373,22 @@ class Variant:
     izhi_key: Optional[str] = None  # izhi_seq, izhi_paral, izhi_dist, izhi_hibr
 
 
-def build_cmd(var: Variant, seed: int, threads: Optional[int], izhi_args: Optional[List[str]]) -> Tuple[List[str], Dict[str, str]]:
-    env_extra = {}
+
+def build_cmd(
+    var: Variant,
+    seed: int,
+    threads: Optional[int],
+    izhi_args: Optional[List[str]]
+) -> Tuple[List[str], Dict[str, str]]:
+    env_extra: Dict[str, str] = {}
 
     args = [str(seed)]
-    #if var.kind in ("omp", "hybrid"):
-    #    if threads is None:
-    #        raise ValueError(f"{var.label} requiere threads")
-    #    args.append(str(threads))
-    #    env_extra["OMP_NUM_THREADS"] = str(threads)
     if var.kind in ("omp", "hybrid"):
         if threads is None:
             raise ValueError(f"{var.label} requiere threads")
         args.append(str(threads))
 
-        # Variables OpenMP para el runtime
+        # Variables OpenMP para el runtime (en el launcher local)
         env_extra["OMP_NUM_THREADS"] = str(threads)
         env_extra["OMP_DYNAMIC"] = OMP_DYNAMIC
         env_extra["OMP_WAIT_POLICY"] = OMP_WAIT_POLICY
@@ -371,19 +403,35 @@ def build_cmd(var: Variant, seed: int, threads: Optional[int], izhi_args: Option
     if var.kind in ("seq", "omp"):
         return [var.exe] + args, env_extra
 
+    # --------------------------------------------------------
+    # FIX: en híbrido, exportar OMP_* a TODOS los ranks MPI
+    # usando -x VAR=VAL (Open MPI). [web:543][web:539]
+    # --------------------------------------------------------
     mpicmd = [
         "mpirun",
         "-np", str(N_PROCESOS),
         "--hostfile", HOSTFILE,
         "--mca", "btl_tcp_if_include", IFACE,
-        var.exe
-    ] + args
+    ]
+
+    if var.kind == "hybrid":
+        mpicmd += [
+            "-x", f"OMP_NUM_THREADS={env_extra['OMP_NUM_THREADS']}",
+            "-x", f"OMP_DYNAMIC={OMP_DYNAMIC}",
+            "-x", f"OMP_WAIT_POLICY={OMP_WAIT_POLICY}",
+            "-x", f"OMP_PROC_BIND={OMP_PROC_BIND}",
+            "-x", f"OMP_PLACES={OMP_PLACES}",
+        ]
+
+    mpicmd += [var.exe] + args
     return mpicmd, env_extra
+
 
 
 # ============================================================
 # Ejecución
 # ============================================================
+
 
 def run_one(
     suite: str,
@@ -454,6 +502,7 @@ def run_one(
     print(f"  ✅ CSV: {out_csv_path} | wall={wall_s:.2f}s | energy_j={energy_j}")
 
 
+
 def ask_yes_no(prompt: str, default: str = "n") -> bool:
     default = default.lower().strip()
     while True:
@@ -466,10 +515,12 @@ def ask_yes_no(prompt: str, default: str = "n") -> bool:
             return False
 
 
+
 def delete_csvs():
     for p in glob.glob(os.path.join(CSV_DIR, "*.csv")):
         os.remove(p)
     print(f"🧹 CSVs eliminados en {CSV_DIR}")
+
 
 
 def main():
@@ -621,6 +672,7 @@ def main():
     if not HAVE_PYRAPL:
         print("ℹ️ pyRAPL no está disponible; energía/potencia quedarán vacías (solo tiempos).")
     return 0
+
 
 
 if __name__ == "__main__":
