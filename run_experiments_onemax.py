@@ -36,6 +36,12 @@ N_PROCESOS = 6
 HOSTFILE = "hosts.txt"
 IFACE = "tailscale0"
 
+# OpenMP runtime hints (para evitar spin-wait en híbrido/oversubscription)
+OMP_WAIT_POLICY = "PASSIVE"     # ACTIVE|PASSIVE [web:460]
+OMP_PROC_BIND   = "true"        # true/false/master/close/spread [web:414]
+OMP_PLACES      = "cores"       # threads/cores/sockets o lista explícita [web:480]
+OMP_DYNAMIC     = "false"
+
 # Binarios OneMax
 EXEC_OM_ELITE_SEQ   = "./cga_onemax"
 EXEC_OM_IZHI_SEQ    = "./cga_izhi_onemax"
@@ -301,7 +307,13 @@ def build_cmd(
         if threads is None:
             raise ValueError(f"{var.label} requiere threads")
         args.append(str(threads))
+
+        # Variables OpenMP para el runtime
         env_extra["OMP_NUM_THREADS"] = str(threads)
+        env_extra["OMP_DYNAMIC"] = OMP_DYNAMIC
+        env_extra["OMP_WAIT_POLICY"] = OMP_WAIT_POLICY
+        env_extra["OMP_PROC_BIND"] = OMP_PROC_BIND
+        env_extra["OMP_PLACES"] = OMP_PLACES
 
     if var.izhi_key is not None:
         if not izhi_args:
