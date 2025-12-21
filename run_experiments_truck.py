@@ -29,8 +29,8 @@ os.makedirs(PARAM_DIR, exist_ok=True)
 
 
 # Runs
-N_RUNS_MAIN = 5
-N_RUNS_PERF = 3
+N_RUNS_MAIN = 7
+N_RUNS_PERF = 10
 
 
 THREAD_SET = [1, 2, 4, 6, 8, 12, 16, 24, 32]

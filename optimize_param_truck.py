@@ -21,7 +21,7 @@ FINAL_FITNESS_TAGS = [
 TIMEOUT_SEC = 15000
 
 # (Se sobrescribe por len(seeds))
-N_REPS = 3
+N_REPS = 6
 
 WARMUP_RANDOM = 10
 TOP_FRAC = 0.30
