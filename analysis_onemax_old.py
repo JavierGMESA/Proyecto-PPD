@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-
 import os
 import glob
 import pandas as pd
@@ -9,11 +8,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-
 CSV_DIR = "./CSVsOnemax"
 IMG_DIR = "./ImagenesResultadoOnemax"
 os.makedirs(IMG_DIR, exist_ok=True)
-
 
 
 VARIANTS_ALL = [
@@ -22,13 +19,11 @@ VARIANTS_ALL = [
 ]
 
 
-# MOD: añadida columna "picos" (compatible con CSVs antiguos: se rellena con NaN)
 GEN_COLS = [
     "gen", "seed", "threads",
-    "best_global", "picos",
+    "best_global",
     "fit_best", "fit_worst", "fit_mean",
 ]
-
 
 
 def plot_save(fig, name):
@@ -39,10 +34,8 @@ def plot_save(fig, name):
     print(f"✓ guardada {path}")
 
 
-
 def _glob_genstats(variant: str):
     return sorted(glob.glob(os.path.join(CSV_DIR, f"genstats_{variant}_run*.csv")))
-
 
 
 def load_runs_genstats(variant: str):
@@ -52,20 +45,17 @@ def load_runs_genstats(variant: str):
         try:
             df = pd.read_csv(f)
 
-            # Asegurar columnas esperadas (si el CSV es antiguo)
             for c in GEN_COLS:
                 if c not in df.columns:
                     df[c] = np.nan
 
-            # MOD: incluir "picos" en el cast numérico
-            for c in ["gen", "best_global", "picos", "fit_best", "fit_mean", "fit_worst"]:
+            for c in ["gen", "best_global", "fit_best", "fit_mean", "fit_worst"]:
                 df[c] = pd.to_numeric(df[c], errors="coerce")
 
             runs.append(df)
         except Exception:
             pass
     return runs
-
 
 
 def agg_by_generation(runs, cols):
@@ -76,14 +66,12 @@ def agg_by_generation(runs, cols):
     return g.mean(), g.std()
 
 
-
 def final_metric_list(runs, column):
     vals = []
     for df in runs:
         if not df.empty and column in df.columns:
             vals.append(df[column].iloc[-1])
     return vals
-
 
 
 # =============================
@@ -109,7 +97,6 @@ def load_runs_summary():
             df[c] = pd.to_numeric(df[c], errors="coerce")
 
     return df
-
 
 
 # =============================
@@ -164,7 +151,6 @@ def plot_fitness_mean_all():
     plot_save(fig, "onemax_fitness_medio_todas.png")
 
 
-
 def plot_boxplot_final_fitness():
     tick_labels = ["E sec", "E OMP", "E MPI", "E híbr", "I sec", "I OMP", "I MPI", "I híbr"]
     series = []
@@ -179,7 +165,6 @@ def plot_boxplot_final_fitness():
     ax.set_ylabel("Fitness alcanzado")
     ax.grid(True)
     plot_save(fig, "onemax_fitness_final_boxplot_todas.png")
-
 
 
 def plot_variant_evolution_triplets(variant):
@@ -204,60 +189,6 @@ def plot_variant_evolution_triplets(variant):
 
     safe = variant.replace("onemax_", "").replace("_", "-")
     plot_save(fig, f"{safe}_fitness_triple.png")
-
-
-
-# MOD: nueva gráfica de picos (solo variantes Izhi)
-def plot_picos_mean_izhi_all():
-    izhi_variants = [
-        "onemax_izhi_seq",
-        "onemax_izhi_paral",
-        "onemax_izhi_dist",
-        "onemax_izhi_hibr",
-    ]
-
-    fig, ax = plt.subplots(figsize=(10, 6))
-
-    styles = {
-        "onemax_izhi_seq":   dict(lw=2),
-        "onemax_izhi_paral": dict(lw=2, ls="--"),
-        "onemax_izhi_dist":  dict(lw=2, ls=":"),
-        "onemax_izhi_hibr":  dict(lw=2, ls="-."),
-    }
-
-    labels = {
-        "onemax_izhi_seq":   "Izhi OneMax sec.",
-        "onemax_izhi_paral": "Izhi OneMax OMP",
-        "onemax_izhi_dist":  "Izhi OneMax MPI",
-        "onemax_izhi_hibr":  "Izhi OneMax híbrido",
-    }
-
-    plotted_any = False
-    for v in izhi_variants:
-        runs = load_runs_genstats(v)
-        agg = agg_by_generation(runs, ["picos"])
-        if agg is None:
-            continue
-
-        mean, _ = agg
-        if "picos" not in mean.columns or mean["picos"].isna().all():
-            continue
-
-        ax.plot(mean.index, mean["picos"].values, label=labels[v], **styles[v])
-        plotted_any = True
-
-    if not plotted_any:
-        plt.close(fig)
-        print("Aviso: no hay datos genstats_*.csv con columna 'picos' para Izhi.")
-        return
-
-    ax.set_title("OneMax Izhi: Picos medios por generación")
-    ax.set_xlabel("Generación")
-    ax.set_ylabel("Picos")
-    ax.grid(True)
-    ax.legend()
-    plot_save(fig, "onemax_picos_medio_izhi_todas.png")
-
 
 
 # =============================
@@ -290,7 +221,6 @@ def perf_aggregate(df_summary: pd.DataFrame, variant: str) -> pd.DataFrame | Non
     return pd.DataFrame([row])
 
 
-
 def get_T_at_threads(tab: pd.DataFrame, t: int) -> float | None:
     if tab is None or tab.empty:
         return None
@@ -300,7 +230,6 @@ def get_T_at_threads(tab: pd.DataFrame, t: int) -> float | None:
     return float(d["wall_time_s"].iloc[0])
 
 
-
 def get_baseline_time_any(tab: pd.DataFrame) -> float | None:
     if tab is None or tab.empty:
         return None
@@ -308,7 +237,6 @@ def get_baseline_time_any(tab: pd.DataFrame) -> float | None:
     if t1 is not None and np.isfinite(t1):
         return t1
     return float(pd.to_numeric(tab["wall_time_s"], errors="coerce").dropna().iloc[0]) if tab["wall_time_s"].notna().any() else None
-
 
 
 def plot_perf_set(title: str, tab_series: pd.DataFrame, T_ref_speedup: float, out_prefix: str):
@@ -367,7 +295,6 @@ def plot_perf_set(title: str, tab_series: pd.DataFrame, T_ref_speedup: float, ou
     plot_save(fig, f"{out_prefix}_times.png")
 
 
-
 def plot_perf_all():
     df = load_runs_summary()
     if df is None or df.empty:
@@ -391,7 +318,6 @@ def plot_perf_all():
         plot_perf_set("Híbrida Elite (base: MPI)", tab, T_elite_dist, "perf_elite_hybrid")
     else:
         print("Info: no hay datos PERF suficientes para Híbrida Elite (serie o baseline).")
-
 
 
 # =============================
@@ -454,7 +380,6 @@ def plot_main_consumption_by_variant():
         )
 
 
-
 def main():
     plot_fitness_mean_all()
     plot_boxplot_final_fitness()
@@ -462,16 +387,11 @@ def main():
     for v in VARIANTS_ALL:
         plot_variant_evolution_triplets(v)
 
-    # MOD: nueva gráfica de picos
-    plot_picos_mean_izhi_all()
-
     plot_perf_all()
     plot_main_consumption_by_variant()
 
     print("✓ análisis OneMax completado")
 
 
-
 if __name__ == "__main__":
     main()
-

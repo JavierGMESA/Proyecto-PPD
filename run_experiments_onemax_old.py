@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-
 import os
 import re
 import csv
@@ -14,44 +13,35 @@ from typing import Optional, List, Dict, Tuple
 from itertools import cycle, islice
 
 
-
 # ============================================================
 # CONFIG (OneMax)
 # ============================================================
-
 
 CSV_DIR = "./CSVsOnemax"
 PARAM_DIR = "./MejoresParametrosOneMax"
 SEEDS_FILE = "./seeds.txt"
 
-
 os.makedirs(CSV_DIR, exist_ok=True)
 os.makedirs(PARAM_DIR, exist_ok=True)
-
 
 # Runs
 N_RUNS_MAIN = 15
 N_RUNS_PERF = 25
 
-
 THREAD_SET = [1, 2, 4, 6, 8, 12, 16, 24, 32]
 
-
 TIMEOUT_SEC = 12000
-
 
 # MPI config
 N_PROCESOS = 10
 HOSTFILE = "hosts.txt"
 IFACE = "tailscale0"
 
-
 # OpenMP runtime hints (para evitar spin-wait en híbrido/oversubscription)
 OMP_WAIT_POLICY = "PASSIVE"     # ACTIVE|PASSIVE
 OMP_PROC_BIND   = "true"        # true/false/master/close/spread
 OMP_PLACES      = "cores"       # threads/cores/sockets o lista explícita
 OMP_DYNAMIC     = "false"
-
 
 
 # Binarios OneMax
@@ -65,7 +55,6 @@ EXEC_OM_ELITE_HIBR  = "./cga_hibrid_onemax"
 EXEC_OM_IZHI_HIBR   = "./cga_hibrid_izhi_onemax"
 
 
-
 # Base names EXACTOS como en optimize_param_onemax.py
 BASE_NAMES = {
     "izhi_seq":   "mejores_parametros_izhi_onemax",
@@ -73,7 +62,6 @@ BASE_NAMES = {
     "izhi_dist":  "mejores_parametros_distrib_izhi_onemax",
     "izhi_hibr":  "mejores_parametros_hibrid_izhi_onemax",
 }
-
 
 
 # Orden parámetros Izhi
@@ -87,7 +75,6 @@ PARAM_ORDER = [
 ]
 
 
-
 FINAL_FITNESS_TAGS = [
     "Mejor fitness global:",
     "Mejor fitness encontrado:",
@@ -96,11 +83,9 @@ FINAL_FITNESS_TAGS = [
 ]
 
 
-
 # ============================================================
 # (Opcional) Energía con pyRAPL
 # ============================================================
-
 
 HAVE_PYRAPL = False
 try:
@@ -113,18 +98,15 @@ except Exception:
     raise ValueError("Falta instalar pyRAPL")
 
 
-
 def measure_energy_joules(fn):
     """Devuelve (energy_j, result_dict). energy_j=None si no hay pyRAPL."""
     if not HAVE_PYRAPL:
         return None, fn()
 
-
     m = pyRAPL.Measurement("run")
     m.begin()
     result = fn()
     m.end()
-
 
     energy_j = None
     try:
@@ -133,27 +115,18 @@ def measure_energy_joules(fn):
     except Exception:
         energy_j = None
 
-
     return energy_j, result
-
 
 
 # ============================================================
 # Parseo stdout -> filas por generación (OneMax)
 # ============================================================
 
-
 RE_GEN = re.compile(r"^\s*Generación\s+(\d+)\s*$")
-
-# MOD: aceptar opcionalmente "| Picos presentados: <int>"
-RE_GLOBAL = re.compile(
-    r"Mejor fitness global:\s*([-\d\.eE]+)\s*(?:\|\s*Picos presentados:\s*([-\d]+))?\s*$"
-)
-
+RE_GLOBAL = re.compile(r"Mejor fitness global:\s*([-\d\.eE]+)\s*$")
 RE_FIT = re.compile(
     r"Mejor fitness:\s*([-\d\.eE]+)\s*\|\s*Peor fitness:\s*([-\d\.eE]+)\s*\|\s*Promedio de fitness:\s*([-\d\.eE]+)\s*$"
 )
-
 
 
 def parse_fitness_global_final(output_text: str) -> Optional[float]:
@@ -164,7 +137,6 @@ def parse_fitness_global_final(output_text: str) -> Optional[float]:
                     return float(line.split(tag, 1)[1].strip().split()[0])
                 except Exception:
                     pass
-
 
     for line in output_text.splitlines()[::-1]:
         if "Mejor fitness global" in line:
@@ -180,15 +152,12 @@ def parse_fitness_global_final(output_text: str) -> Optional[float]:
     return None
 
 
-
 def parse_generation_rows(output_text: str, seed: int, threads: Optional[int]) -> List[Dict]:
     rows: List[Dict] = []
     cur: Optional[Dict] = None
 
-
     for raw in output_text.splitlines():
         line = raw.strip()
-
 
         m = RE_GEN.match(line)
         if m:
@@ -197,28 +166,17 @@ def parse_generation_rows(output_text: str, seed: int, threads: Optional[int]) -
                 "seed": seed,
                 "threads": (threads if threads is not None else ""),
                 "best_global": "",
-                # MOD: nueva columna
-                "picos": "",
                 "fit_best": "", "fit_worst": "", "fit_mean": "",
             }
             continue
 
-
         if cur is None:
             continue
-
 
         m = RE_GLOBAL.search(line)
         if m:
             cur["best_global"] = float(m.group(1))
-            # MOD: capturar picos si existe
-            if m.group(2) is not None:
-                try:
-                    cur["picos"] = int(m.group(2))
-                except Exception:
-                    cur["picos"] = ""
             continue
-
 
         m = RE_FIT.search(line)
         if m:
@@ -229,18 +187,14 @@ def parse_generation_rows(output_text: str, seed: int, threads: Optional[int]) -
             cur = None
             continue
 
-
     return rows
 
 
-
-# MOD: añadir "picos" en las columnas del CSV
 GEN_COLS = [
     "gen", "seed", "threads",
-    "best_global", "picos",
+    "best_global",
     "fit_best", "fit_worst", "fit_mean",
 ]
-
 
 
 RUN_SUMMARY_FILE = os.path.join(CSV_DIR, "runs_summary.csv")
@@ -251,11 +205,9 @@ RUN_SUMMARY_COLS = [
 ]
 
 
-
 # ============================================================
 # Helpers: seeds, params, incremental
 # ============================================================
-
 
 def read_seeds(path: str) -> List[int]:
     if not os.path.exists(path):
@@ -272,11 +224,9 @@ def read_seeds(path: str) -> List[int]:
     return seeds
 
 
-
 def seeds_for_n_runs(seeds_all: List[int], n: int) -> List[int]:
     """Devuelve exactamente n seeds; si faltan, repite cíclicamente."""
     return list(islice(cycle(seeds_all), n))
-
 
 
 def check_exec(path: str) -> bool:
@@ -286,12 +236,10 @@ def check_exec(path: str) -> bool:
     return ok
 
 
-
 def ensure_summary_header():
     if not os.path.exists(RUN_SUMMARY_FILE):
         with open(RUN_SUMMARY_FILE, "w", newline="", encoding="utf-8") as f:
             csv.writer(f).writerow(RUN_SUMMARY_COLS)
-
 
 
 def existing_run_ids(pattern_glob: str) -> List[int]:
@@ -303,19 +251,16 @@ def existing_run_ids(pattern_glob: str) -> List[int]:
     return sorted(set(out))
 
 
-
 def missing_run_ids(prefix: str, target: int, tag: str) -> List[int]:
     pattern = os.path.join(CSV_DIR, f"{prefix}{tag}_run*.csv")
     have = set(existing_run_ids(pattern))
     return [k for k in range(1, target + 1) if k not in have]
 
 
-
 def load_izhi_params_for(key: str) -> Optional[List[str]]:
     base = BASE_NAMES[key]
     json_path = os.path.join(PARAM_DIR, base + ".json")
     txt_path = os.path.join(PARAM_DIR, base + ".txt")
-
 
     # 1) JSON (preferido)
     if os.path.exists(json_path):
@@ -332,7 +277,6 @@ def load_izhi_params_for(key: str) -> Optional[List[str]]:
             return args
         except Exception as e:
             print(f"⚠️ Error leyendo {json_path}: {e}")
-
 
     # 2) TXT (fallback)
     if os.path.exists(txt_path):
@@ -355,15 +299,12 @@ def load_izhi_params_for(key: str) -> Optional[List[str]]:
         except Exception as e:
             print(f"⚠️ Error leyendo {txt_path}: {e}")
 
-
     return None
-
 
 
 # ============================================================
 # Construcción de comandos
 # ============================================================
-
 
 @dataclass(frozen=True)
 class Variant:
@@ -371,7 +312,6 @@ class Variant:
     exe: str
     kind: str  # seq, omp, mpi, hybrid
     izhi_key: Optional[str] = None  # izhi_seq, izhi_paral, izhi_dist, izhi_hibr
-
 
 
 def build_cmd(
@@ -382,13 +322,11 @@ def build_cmd(
 ) -> Tuple[List[str], Dict[str, str]]:
     env_extra: Dict[str, str] = {}
 
-
     args = [str(seed)]
     if var.kind in ("omp", "hybrid"):
         if threads is None:
             raise ValueError(f"{var.label} requiere threads")
         args.append(str(threads))
-
 
         # Variables OpenMP para el runtime (siempre las ponemos en env del proceso)
         env_extra["OMP_NUM_THREADS"] = str(threads)
@@ -397,20 +335,17 @@ def build_cmd(
         env_extra["OMP_PROC_BIND"] = OMP_PROC_BIND
         env_extra["OMP_PLACES"] = OMP_PLACES
 
-
     if var.izhi_key is not None:
         if not izhi_args:
             raise RuntimeError(f"No hay parámetros Izhi para {var.label}")
         args.extend(izhi_args)
 
-
     if var.kind in ("seq", "omp"):
         return [var.exe] + args, env_extra
 
-
     # --------------------------------------------------------
     # FIX: exportar explícitamente OMP_* a los ranks (Open MPI)
-    # Usar -x VAR o -x VAR=VAL; se aplica a MPI e híbrido.
+    # Usar -x VAR o -x VAR=VAL; se aplica a MPI e híbrido. [web:543]
     # --------------------------------------------------------
     mpicmd = [
         "mpirun",
@@ -418,7 +353,6 @@ def build_cmd(
         "--hostfile", HOSTFILE,
         "--mca", "btl_tcp_if_include", IFACE,
     ]
-
 
     # Para híbrido: definir y exportar valores concretos a todos los ranks
     if var.kind == "hybrid":
@@ -430,16 +364,13 @@ def build_cmd(
             "-x", f"OMP_PLACES={OMP_PLACES}",
         ]
 
-
     mpicmd += [var.exe] + args
     return mpicmd, env_extra
-
 
 
 # ============================================================
 # Ejecución
 # ============================================================
-
 
 def run_one(
     suite: str,
@@ -452,15 +383,12 @@ def run_one(
 ):
     ensure_summary_header()
 
-
     cmd, env_extra = build_cmd(var, seed, threads, izhi_args)
     env = os.environ.copy()
     env.update(env_extra)
 
-
     print(f"\n🔄 [{suite}] {var.label} run={run_id} seed={seed} threads={threads}")
     print("   CMD:", " ".join(cmd))
-
 
     def _do():
         t0 = time.perf_counter()
@@ -474,20 +402,16 @@ def run_one(
         except subprocess.CalledProcessError as e:
             return {"rc": e.returncode, "out": e.output or "", "wall": time.perf_counter() - t0}
 
-
         wall = time.perf_counter() - t0
         return {"rc": rc, "out": out, "wall": wall}
-
 
     energy_j, res = measure_energy_joules(_do)
     rc = res["rc"]
     out = res["out"]
     wall_s = res["wall"]
 
-
     rows = parse_generation_rows(out, seed=seed, threads=threads)
     final_best = parse_fitness_global_final(out)
-
 
     # Guardar CSV por generación
     with open(out_csv_path, "w", newline="", encoding="utf-8") as f:
@@ -496,11 +420,9 @@ def run_one(
         for r in rows:
             w.writerow(r)
 
-
     avg_power_w = ""
     if energy_j is not None and wall_s > 0:
         avg_power_w = f"{(energy_j / wall_s):.6f}"
-
 
     with open(RUN_SUMMARY_FILE, "a", newline="", encoding="utf-8") as f:
         csv.writer(f).writerow([
@@ -514,11 +436,9 @@ def run_one(
             rc
         ])
 
-
     if rc != 0:
         print(f"  ⚠️ return_code={rc} (revisa runs_summary.csv)")
     print(f"  ✅ CSV: {out_csv_path} | wall={wall_s:.2f}s | energy_j={energy_j}")
-
 
 
 def ask_yes_no(prompt: str, default: str = "n") -> bool:
@@ -533,12 +453,10 @@ def ask_yes_no(prompt: str, default: str = "n") -> bool:
             return False
 
 
-
 def delete_csvs():
     for p in glob.glob(os.path.join(CSV_DIR, "*.csv")):
         os.remove(p)
     print(f"🧹 CSVs eliminados en {CSV_DIR}")
-
 
 
 def main():
@@ -546,11 +464,9 @@ def main():
     print("RUN EXPERIMENTS ONEMAX")
     print("=" * 70)
 
-
     # 0) Limpieza
     if ask_yes_no(f"¿Eliminar CSVs existentes en {CSV_DIR}?", default="n"):
         delete_csvs()
-
 
     # 1) Comprobar binarios
     print("\nComprobando ejecutables...")
@@ -566,12 +482,10 @@ def main():
         print("❌ Faltan ejecutables. Compila con make y reintenta.")
         return 1
 
-
     # 2) Seeds
     seeds = read_seeds(SEEDS_FILE)
     if len(seeds) < max(N_RUNS_MAIN, N_RUNS_PERF):
         raise ValueError(f"{SEEDS_FILE} debe tener al menos {max(N_RUNS_MAIN, N_RUNS_PERF)} seeds.")
-
 
     # 3) Cargar params Izhi (4 variantes)
     izhi_args = {
@@ -584,7 +498,6 @@ def main():
         if v is None:
             print(f"⚠️ No se encontraron parámetros para {k} en {PARAM_DIR}. Se omitirá esa variante Izhi.")
 
-
     # 4) Threads para suite MAIN (un único valor)
     default_threads_main = 12
     try:
@@ -593,20 +506,17 @@ def main():
     except Exception:
         threads_main = default_threads_main
 
-
     variants_main = [
         Variant("onemax_elite_seq",   EXEC_OM_ELITE_SEQ,   "seq",    None),
         Variant("onemax_elite_paral", EXEC_OM_ELITE_PARAL, "omp",    None),
         Variant("onemax_elite_dist",  EXEC_OM_ELITE_DIST,  "mpi",    None),
         Variant("onemax_elite_hibr",  EXEC_OM_ELITE_HIBR,  "hybrid", None),
 
-
         Variant("onemax_izhi_seq",    EXEC_OM_IZHI_SEQ,    "seq",    "izhi_seq"),
         Variant("onemax_izhi_paral",  EXEC_OM_IZHI_PARAL,  "omp",    "izhi_paral"),
         Variant("onemax_izhi_dist",   EXEC_OM_IZHI_DIST,   "mpi",    "izhi_dist"),
         Variant("onemax_izhi_hibr",   EXEC_OM_IZHI_HIBR,   "hybrid", "izhi_hibr"),
     ]
-
 
     # ========================================================
     # SUITE MAIN
@@ -615,18 +525,15 @@ def main():
     print(f"SUITE MAIN ({N_RUNS_MAIN} runs): 8 variantes")
     print("=" * 70)
 
-
     for var in variants_main:
         if var.izhi_key is not None and izhi_args.get(var.izhi_key) is None:
             print(f"\n⏭️  Omitiendo {var.label} (sin params Izhi).")
             continue
 
-
         miss = missing_run_ids(prefix="genstats_", target=N_RUNS_MAIN, tag=var.label)
         if not miss:
             print(f"\n✅ {var.label}: ya hay {N_RUNS_MAIN} runs, se omite.")
             continue
-
 
         for run_id in miss:
             seed = seeds[run_id - 1]
@@ -642,14 +549,12 @@ def main():
                 out_csv_path=out_csv
             )
 
-
     # ========================================================
     # SUITE PERF: solo sin-Izhi + barrido de hilos (igual que Truck)
     # ========================================================
     print("\n" + "=" * 70)
     print(f"SUITE PERF ({N_RUNS_PERF} runs): solo sin-Izhi + barrido de hilos")
     print("=" * 70)
-
 
     perf_variants = [
         Variant("onemax_elite_seq",   EXEC_OM_ELITE_SEQ,   "seq",    None),
@@ -658,10 +563,8 @@ def main():
         Variant("onemax_elite_hibr",  EXEC_OM_ELITE_HIBR,  "hybrid", None),
     ]
 
-
     # Semilla fija para perf (como en Truck)
     seed_perf = seeds[0]
-
 
     # Baselines seq y dist: N_RUNS_PERF runs (threads vacío, pero sufijo _t1)
     for var in perf_variants:
@@ -679,7 +582,6 @@ def main():
                     izhi_args=None,
                     out_csv_path=out_csv
                 )
-
 
     # OMP e híbrida: N_RUNS_PERF por cada threads
     for var in perf_variants:
@@ -700,14 +602,12 @@ def main():
                     out_csv_path=out_csv
                 )
 
-
     print("\n✅ FIN")
     print("CSVs:", CSV_DIR)
     print("Resumen (tiempo/energía):", RUN_SUMMARY_FILE)
     if not HAVE_PYRAPL:
         print("ℹ️ pyRAPL no está disponible; energía/potencia quedarán vacías (solo tiempos).")
     return 0
-
 
 
 if __name__ == "__main__":

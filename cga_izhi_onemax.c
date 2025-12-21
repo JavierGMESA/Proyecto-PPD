@@ -220,7 +220,7 @@ int main(int argc, char *argv[]) {
             for (int j = 0; j < N_COLS; j++)
                 copiar(&poblacion[i][j], &nueva_poblacion[i][j]);
 
-        printf("Generación %d\nMejor fitness global: %d\n", gen, mejor_fitness_global);
+        printf("Generación %d\nMejor fitness global: %d | Picos presentados: %ld\n", gen, mejor_fitness_global, total_picos);
         printf("Mejor fitness: %d | Peor fitness: %d | Promedio de fitness: %d\n", mejor_fitness, peor_fitness, suma_fitness / (N_ROWS*N_COLS));
     }
 
