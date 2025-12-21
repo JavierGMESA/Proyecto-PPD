@@ -29,7 +29,7 @@ P_EXPLOIT = 0.70
 P_EXPLORE = 0.30
 
 # MPI config
-N_PROCESOS = 6
+N_PROCESOS = 10
 HOSTFILE = "hosts.txt"
 IFACE = "tailscale0"
 

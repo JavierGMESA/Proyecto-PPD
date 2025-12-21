@@ -1,2 +1,2 @@
-HP-Javier-Garcia-Mesa slots=4
-jgm-server slots=4
+HP-Javier-Garcia-Mesa slots=6
+jgm-server slots=6

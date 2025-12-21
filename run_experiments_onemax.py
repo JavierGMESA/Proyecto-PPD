@@ -33,7 +33,7 @@ THREAD_SET = [1, 2, 4, 6, 8, 12, 16, 24, 32]
 TIMEOUT_SEC = 12000
 
 # MPI config
-N_PROCESOS = 6
+N_PROCESOS = 10
 HOSTFILE = "hosts.txt"
 IFACE = "tailscale0"
 

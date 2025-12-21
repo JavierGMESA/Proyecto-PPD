@@ -41,7 +41,7 @@ TIMEOUT_SEC = 12000
 
 
 # MPI config
-N_PROCESOS = 6
+N_PROCESOS = 10
 HOSTFILE = "hosts.txt"
 IFACE = "tailscale0"
 
