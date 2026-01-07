@@ -26,7 +26,7 @@ GEN_COLS = [
 ]
 
 # ======= PARCHE TEMPORAL (solo emis_mean) =======
-FIX_EMIS_MEAN_SCALE = True
+FIX_EMIS_MEAN_SCALE = False
 def _fix_emis_mean_scale(df: pd.DataFrame) -> pd.DataFrame:
     if FIX_EMIS_MEAN_SCALE and "emis_mean" in df.columns:
         df["emis_mean"] = pd.to_numeric(df["emis_mean"], errors="coerce") * 100.0

@@ -1,23 +1,59 @@
-- Para compilar los programas: tenemos un fichero Makefile para compilarlos, así que haciendo simplemente "make all" compilais.
-
 - Para poder ejecutar cualquier de los scripts de python:
     - Hay que entrar en el entorno virtual de python (es decir, que a la izquierda del prompt os salga "(venv)". Para ello 
     simplemente meted en la terminal "source venv/bin/activate". Si por lo que sea luego quereis salir del entorno virtual 
     simplemente escribid en la terminal "deactivate".
 
-- Antes de ejecutar nada hay que compilar todos los códigos: meter en la terminal "make all".
+- Para realizar una ejecución simple de un archivo del proyecto está el script "ejecucion_ejemplo.py", el cual te permite ejecutar
+las versiones paralelas del Onemax para que puedas observar alguna ejecución. Simplemente ejecuta "python3 ejecucion_ejemplo.py", 
+introduce el número de hilos a utilizar y selecciona la versión a ejecutar.
 
-- Para optimizar los parámetros de Izhikevich:
-    - Como sabreis ya las versiones de Izhikevich tienen unos parámetros dinámicos pero parten de ciertas variaciones que son estáticas
-    y que se introducen a la hora de ejecutar.
-    - Para poder optimizar estas variaciones están los scripts de python "optimize" (recordad que hay que ejecutarlos dentro del entorno
-    virtual de python:
-        - Si queremos optimizar los parámetros de la versión de Izhikevich secuencial ejecutamos el "new_optimice_param.py".
-        - Si queremos optimizar los parámetros de la versión de Izhikevich con openMP ejecutamos el "new_optimice_paral_param.py".
+- Lo primero a tener en cuenta es que para la ejecución de versiones distribuidas e híbridas HAY QUE TENER LA MISMA VERSIÓN 
+EXACTA DE LA LIBRERÍA QUE IMPLEMENTA MPI. En nuestro caso hemos instalado la versión 4.1.2 de OpenMPI utilizando los siguientes
+comandos:
+    wget https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-4.1.2.tar.gz
+    tar xf openmpi-4.1.2.tar.gz
+    cd openmpi-4.1.2
+
+    ./configure --prefix=/opt/ompi-4.1.2 --with-pmix=internal
+    make -j$(nproc)
+    sudo make install
+
+    export PATH=/opt/ompi-4.1.2/bin:$PATH
+    export LD_LIBRARY_PATH=/opt/ompi-4.1.2/lib:$LD_LIBRARY_PATH
+
+- También hay que configurar los hosts del sistema distribuida en el fichero "hosts.txt" especificando que equipos participan y el
+número de procesos que ejecutará cada equipo. Relacionado con esto también habría que modificar cada script de python cambiando la
+variable "IFACE", la cual guarda la interfaz de red que utilizarán TODOS LOS EQUIPOS para la comunicación en las versiones distribuidas
+e híbridas.
+
+- Para compilar los programas: tenemos un fichero Makefile para compilarlos, así que haciendo simplemente "make all" compilais.
+
+- Una vez dentro del entorno virtual de python hay que introducir el siguiente comando:
+  "sudo chmod -R a+r /sys/class/powercap/intel-rapl"
+    - Este comando sirve para que en los experimentos se puedan medir los valores de consumo del procesador y así crear gráficas
+    de estos datos.
+
+- Antes de ejecutar nada hay que compilar todos los códigos: meter en la terminal "make all" para compilar todos los códigos.
+
+- Para optimizar los parámetros de Izhikevich usamos los script "optimize_param":
+    - Si queremos optimizar los parámetros del problema del Onemax ejecutamos "python3 optimize_param_onemax.py", seleccionamos la
+    versión que queramos optimizar e introducimos el número de hilos a utilizar en caso de que vayamos a optimizar los parámetros
+    de la versión paralela o híbrida.
+    - Si queremos optimizar los parámetros del problema del Camión híbrido ejecutamos "python3 optimize_param_truck.py", seleccionamos 
+    la versión que queramos optimizar e introducimos el número de hilos a utilizar en caso de que vayamos a optimizar los parámetros
+    de la versión paralela o híbrida.
 
 - Para obtener las gráficas de los resultados de fitness:
-    - Simplemente ejecutamos el script "run_experiments.py", y cuando este haya acabado ejecutamos el script "analysis.py". Las
-    gráficas con los resultados las escontrareis en la carpeta "ImagenesResultado".
+    - Para el problema del Onemax ejecutamos "python3 run_experiments_onemax.py", introducimos el número de hilos a utilizar para las
+    versiones paralelas e híbridas y cuando termine ejecutamos "analysis_onemax.py".
+    - Para el problema del Camión híbrido ejecutamos "python3 run_experiments_onemax.py", introducimos el número de hilos a utilizar para 
+    las versiones paralelas e híbridas y cuando termine ejecutamos "analysis_onemax.py".
+
+
+
+
+
+
 
 
 
