@@ -73,7 +73,7 @@ int main(int argc, char *argv[]) {
 
     // Bucle principal
     for (int gen = 0; gen < GEN_MAX; gen++) {
-        #pragma omp parallel for shared(poblacion, nueva_poblacion, mejor_fitness_global) private(i, j, fc, p1, p2, hijo)
+        #pragma omp parallel for shared(poblacion, nueva_poblacion, mejor_fitness_global) private(i, j, fc, p1, p2, hijo) schedule(guided)
         for (i = 0; i < N_ROWS; i++) 
         {
             for (j = 0; j < N_COLS; j++) 
