@@ -29,7 +29,7 @@ os.makedirs(PARAM_DIR, exist_ok=True)
 
 
 # Runs
-N_RUNS_MAIN = 7
+N_RUNS_MAIN = 20
 N_RUNS_PERF = 10
 
 
