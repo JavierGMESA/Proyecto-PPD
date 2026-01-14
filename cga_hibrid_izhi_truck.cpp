@@ -137,7 +137,7 @@ int main(int argc, char *argv[]) {
     for (int gen = 0; gen < GEN_MAX; gen++) 
     {
         total_picos = 0;
-        #pragma omp parallel for shared(a, poblacion, nueva_poblacion, mejor_fitness_global) private(i, j, fc, p1, p2, hijo, hay_pico, hay_mutacion) default(shared)
+        #pragma omp parallel for shared(a, poblacion, nueva_poblacion, mejor_fitness_global) private(i, j, fc, p1, p2, hijo, hay_pico, hay_mutacion) default(shared) schedule(guided)
         for (i = 0; i < N_ROWS; i++) 
         {
             for (j = 0; j < N_COLS; j++) 
