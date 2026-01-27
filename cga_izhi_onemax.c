@@ -4,7 +4,7 @@
 #include "cga_param.h"
 #include "onemax.h"
 
-//Variable para Izhikevich
+//Variables para Izhikevich
 float IniI, IncMutI, IncPosI, IncNegI, IncPicI;
 float IniA;
 float IniB, IncPosB, IncNegB, IncPicB;
@@ -23,8 +23,8 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    //Asignación de variables de entrada
     unsigned int seed = (unsigned int) strtoul(argv[1], NULL, 10);
-    srand(seed);
 
     int idx = 2;
     IniI     = atof(argv[idx++]);
@@ -53,7 +53,23 @@ int main(int argc, char *argv[]) {
     MAX_ULT_PICO = atoi(argv[idx++]);
     MAX_PIC_SEG  = atoi(argv[idx++]);
 
+    //Declaración de variables
     Individuo **poblacion, **nueva_poblacion;
+    Individuo hijo, mejor_individuo;
+    int mejor_fitness_global = 0;
+    int mejor_fitness, peor_fitness, suma_fitness;
+    float v, u;
+    float a = IniA, b = IniB, c = IniC, d = IniD, I = IniI;
+    v = c;
+    u = b * v;
+    short hay_mutacion, hay_pico;
+    long total_picos = 0;
+    int ultimo_pico = 0, picos_seguidos = 0, umbral_f_bajo = 1, umbral_f_alto = 2;
+
+    //Programa principal
+    srand(seed);
+
+    //Creación de población inicial
     poblacion = (Individuo**) calloc(N_ROWS, sizeof(Individuo*));
     nueva_poblacion = (Individuo**) calloc(N_ROWS, sizeof(Individuo*));
     if(!poblacion || !nueva_poblacion)
@@ -73,20 +89,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    Individuo hijo, mejor_individuo;
-    int mejor_fitness_global = 0;
-
-    int mejor_fitness, peor_fitness, suma_fitness;
-
-    float v, u;
-    float a = IniA, b = IniB, c = IniC, d = IniD, I = IniI;
-    v = c;
-    u = b * v;
-    short hay_mutacion, hay_pico;
-    long total_picos = 0;
-    int ultimo_pico = 0, picos_seguidos = 0, umbral_f_bajo = 1, umbral_f_alto = 2;
-
-    // Inicializar población
+    //Inicializar población
     for (i = 0; i < N_ROWS; i++)
         for (j = 0; j < N_COLS; j++)
         {
@@ -99,7 +102,7 @@ int main(int argc, char *argv[]) {
         }
             
 
-    // Bucle principal
+    //Bucle principal
     for (int gen = 0; gen < GEN_MAX; gen++) 
     {
         total_picos = 0;
@@ -108,23 +111,26 @@ int main(int argc, char *argv[]) {
             for (j = 0; j < N_COLS; j++) 
             {
 
-                // Selección de dos padres vecinos
+                //Selección de dos padres vecinos
                 int fc[4];
                 vecino_aleatorios(i, j, fc);
                 Individuo *p1 = &poblacion[fc[0]][fc[1]];
                 Individuo *p2 = &poblacion[fc[2]][fc[3]];
 
-                // Crossover + mutación
+                //Crossover + mutación
                 crossover_1p(p1, p2, &hijo);
                 hay_mutacion = mutar(&hijo);
 
+                //Izhikevich: si hay mutacion cambia la I
                 if(hay_mutacion)
                 {
                     I += IncMutI;
                 }
 
+                //Obtenemos el fitness del hijo
                 hijo.fitness = evaluar(&hijo);
 
+                //Izhikevich: Si la diferencia de fitness es menor que el umbral inferior cambio en las variables
                 if(hijo.fitness - poblacion[i][j].fitness < umbral_f_bajo)
                 {
                     I += IncPosI;
@@ -133,6 +139,7 @@ int main(int argc, char *argv[]) {
                     d += IncPosD;
                 }
 
+                //Izhikevich: Si la diferencia de fitness es mayor que el umbral superior cambio en las variables
                 if(hijo.fitness - poblacion[i][j].fitness > umbral_f_alto)
                 {
                     I += IncNegI;
@@ -141,14 +148,14 @@ int main(int argc, char *argv[]) {
                     d += IncNegD;
                 }
 
+                //Limitamos los parámetros para evitar errores
                 Izhikevich_limitar_parametros(&b, &c, &d, &I);
-
 
                 hay_pico = Izhikevich(&v, &u, a, b, c, d, I);
 
+                //Llevamos la cuenta del nº de picos
                 if(hay_pico)
                 {
-                    //printf("Ha habido pico\n");
                     ultimo_pico = 0;
                     ++picos_seguidos;
                     ++total_picos;
@@ -166,6 +173,7 @@ int main(int argc, char *argv[]) {
                     }
                 }
 
+                //Izhikevich: si hay muchos picos seguidos se cambian las variables
                 if(picos_seguidos > MAX_PIC_SEG)
                 {
                     I += IncPicI;
@@ -176,13 +184,13 @@ int main(int argc, char *argv[]) {
                 }
 
                 Izhikevich_limitar_parametros(&b, &c, &d, &I);
-                // Fuga dependiente del nivel de excitación
+                //Fuga dependiente del nivel de excitación
                 if (picos_seguidos > 5)
                     I *= 0.9f;
                 else
                     I *= 0.98f;
 
-                // Reemplazo elitista
+                //Reemplazo con Izhikevich
                 if(hay_pico || mejor_fitness_f(hijo.fitness, poblacion[i][j].fitness))
                 {
                     copiar(&nueva_poblacion[i][j], &hijo);
@@ -197,6 +205,7 @@ int main(int argc, char *argv[]) {
             }
         }
 
+        //Llevamos la cuenta del mejor, peor y promedio de fitness
         mejor_fitness = suma_fitness = 0;
         peor_fitness = L;
         for(i = 0; i < N_ROWS; ++i)
@@ -215,7 +224,7 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        // Copiar nueva población a actual
+        //Copiar nueva población a actual
         for (int i = 0; i < N_ROWS; i++)
             for (int j = 0; j < N_COLS; j++)
                 copiar(&poblacion[i][j], &nueva_poblacion[i][j]);
@@ -224,10 +233,11 @@ int main(int argc, char *argv[]) {
         printf("Mejor fitness: %d | Peor fitness: %d | Promedio de fitness: %d\n", mejor_fitness, peor_fitness, suma_fitness / (N_ROWS*N_COLS));
     }
 
-    // Resultado final
+    //Resultado final
     printf("\n=== RESULTADO FINAL ===\n");
     printf("Mejor fitness encontrado: %d\nMejor fitness posible: %d\n", mejor_fitness_global, L);
 
+    //Liberamos la memoria
     for(i = 0; i < N_ROWS; ++i)
     {
         free(poblacion[i]);

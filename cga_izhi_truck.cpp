@@ -4,7 +4,7 @@
 #include "cga_param.h"
 #include "truck.hpp"
 
-//Variable para Izhikevich
+//Variables para Izhikevich
 float IniI, IncMutI, IncPosI, IncNegI, IncPicI;
 float IniA;
 float IniB, IncPosB, IncNegB, IncPicB;
@@ -23,8 +23,8 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    //Asignación de variables de entrada
     unsigned int seed = (unsigned int) strtoul(argv[1], NULL, 10);
-    srand(seed);
 
     int idx = 2;
     IniI     = atof(argv[idx++]);
@@ -53,32 +53,8 @@ int main(int argc, char *argv[]) {
     MAX_ULT_PICO = atoi(argv[idx++]);
     MAX_PIC_SEG  = atoi(argv[idx++]);
 
-    //Individuo poblacion[N_ROWS][N_COLS];
-    //Individuo nueva_poblacion[N_ROWS][N_COLS];
+    //Declaración de variables
     Individuo **poblacion, **nueva_poblacion;
-    //poblacion = (Individuo**) calloc(N_ROWS, sizeof(Individuo*));
-    //nueva_poblacion = (Individuo**) calloc(N_ROWS, sizeof(Individuo*));
-    poblacion = new Individuo*[N_ROWS];
-    nueva_poblacion = new Individuo*[N_ROWS];
-    if(!poblacion || !nueva_poblacion)
-    {
-        printf("Ha habido error en la reserva de memoria");
-        return 1;
-    }
-    int i, j;
-    for(i = 0; i < N_ROWS; ++i)
-    {
-        //poblacion[i] = (Individuo*) calloc (N_COLS, sizeof(Individuo));
-        //nueva_poblacion[i] = (Individuo*) calloc (N_COLS, sizeof(Individuo));
-        poblacion[i] = new Individuo[N_COLS];
-        nueva_poblacion[i] = new Individuo[N_COLS];
-        if(!poblacion[i] || !nueva_poblacion[i])
-        {
-            printf("Ha habido error en la reserva de memoria");
-            return 1;
-        }
-    }
-
     Individuo hijo, mejor_individuo;
     double mejor_fitness_global = 0;
     float v, u;
@@ -94,7 +70,30 @@ int main(int argc, char *argv[]) {
     double mejor_green_kms, peor_green_kms, suma_green_kms;
     double mejor_emissions, peor_emissions, suma_emissions;
 
-    // Inicializar población
+    //Programa principal
+    srand(seed);
+
+    //Creación de población inicial
+    poblacion = new Individuo*[N_ROWS];
+    nueva_poblacion = new Individuo*[N_ROWS];
+    if(!poblacion || !nueva_poblacion)
+    {
+        printf("Ha habido error en la reserva de memoria");
+        return 1;
+    }
+    int i, j;
+    for(i = 0; i < N_ROWS; ++i)
+    {
+        poblacion[i] = new Individuo[N_COLS];
+        nueva_poblacion[i] = new Individuo[N_COLS];
+        if(!poblacion[i] || !nueva_poblacion[i])
+        {
+            printf("Ha habido error en la reserva de memoria");
+            return 1;
+        }
+    }
+
+    //Inicializar población
     for (i = 0; i < N_ROWS; i++)
         for (int j = 0; j < N_COLS; j++)
         {
@@ -107,7 +106,7 @@ int main(int argc, char *argv[]) {
         }
             
 
-    // Bucle principal
+    //Bucle principal
     for (int gen = 0; gen < GEN_MAX; gen++) 
     {
         total_picos = 0;
@@ -116,23 +115,26 @@ int main(int argc, char *argv[]) {
             for (j = 0; j < N_COLS; j++) 
             {
 
-                // Selección de dos padres vecinos
+                //Selección de dos padres vecinos
                 int fc[4];
                 vecino_aleatorios(i, j, fc);
                 Individuo *p1 = &poblacion[fc[0]][fc[1]];
                 Individuo *p2 = &poblacion[fc[2]][fc[3]];
 
-                // Crossover + mutación
+                //Crossover + mutación
                 crossover_1p(p1, p2, &hijo);
                 hay_mutacion = mutar(&hijo);
 
+                //Izhikevich: si hay mutacion cambia la I
                 if(hay_mutacion)
                 {
                     I += IncMutI;
                 }
 
+                //Obtenemos el fitness del hijo
                 hijo.fitness = evaluar(&hijo);
 
+                //Izhikevich: Si la diferencia de fitness es menor que el umbral inferior cambio en las variables
                 if(hijo.fitness - poblacion[i][j].fitness < umbral_f_bajo)
                 {
                     I += IncPosI;
@@ -141,6 +143,7 @@ int main(int argc, char *argv[]) {
                     d += IncPosD;
                 }
 
+                //Izhikevich: Si la diferencia de fitness es mayor que el umbral superior cambio en las variables
                 if(hijo.fitness - poblacion[i][j].fitness > umbral_f_alto)
                 {
                     I += IncNegI;
@@ -149,11 +152,12 @@ int main(int argc, char *argv[]) {
                     d += IncNegD;
                 }
 
+                //Limitamos los parámetros para evitar errores
                 Izhikevich_limitar_parametros(&b, &c, &d, &I);
-
 
                 hay_pico = Izhikevich(&v, &u, a, b, c, d, I);
 
+                //Llevamos la cuenta del nº de picos
                 if(hay_pico)
                 {
                     //printf("Ha habido pico\n");
@@ -174,6 +178,7 @@ int main(int argc, char *argv[]) {
                     }
                 }
 
+                //Izhikevich: si hay muchos picos seguidos se cambian las variables
                 if(picos_seguidos > MAX_PIC_SEG)
                 {
                     I += IncPicI;
@@ -184,13 +189,13 @@ int main(int argc, char *argv[]) {
                 }
 
                 Izhikevich_limitar_parametros(&b, &c, &d, &I);
-                // Fuga dependiente del nivel de excitación
+                //Fuga dependiente del nivel de excitación
                 if (picos_seguidos > 5)
                     I *= 0.9f;
                 else
                     I *= 0.98f;
 
-                // Reemplazo elitista
+                //Reemplazo con Izhikevich
                 if(hay_pico || mejor_fitness_f(hijo.fitness, poblacion[i][j].fitness))
                 {
                     copiar(&nueva_poblacion[i][j], &hijo);
@@ -205,6 +210,7 @@ int main(int argc, char *argv[]) {
             }
         }
 
+        //Llevamos la cuenta del mejor, peor y promedio de fitness, kms verdes y CO2
         mejor_green_kms = suma_green_kms = 0.0;
         peor_green_kms = MAX_GREEN_KMS;
         mejor_emissions = MAX_TOTAL_EMISIONS;
@@ -247,7 +253,7 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        // Copiar nueva población a actual
+        //Copiar nueva población a actual
         for (int i = 0; i < N_ROWS; i++)
             for (int j = 0; j < N_COLS; j++)
                 copiar(&poblacion[i][j], &nueva_poblacion[i][j]);
@@ -258,19 +264,16 @@ int main(int argc, char *argv[]) {
         printf("Mejor emissions: %.6f | Peor emissions: %.6f | Promedio de emissions: %.6f\n", mejor_emissions, peor_emissions, suma_emissions / (N_ROWS*N_COLS));
     }
 
-    // Resultado final
+    //Resultado final
     printf("\n=== RESULTADO FINAL ===\n");
     printf("Mejor fitness encontrado: %.6f\nMejor fitness posible: %.6f\n", mejor_fitness_global, 2.0);
 
+    //Liberamos la memoria
     for(i = 0; i < N_ROWS; ++i)
     {
-        //free(poblacion[i]);
-        //free(nueva_poblacion[i]);
         delete[] poblacion[i];
         delete[] nueva_poblacion[i];
     }
-    //free(poblacion);
-    //free(nueva_poblacion);
     delete[] poblacion;
     delete[] nueva_poblacion; 
 

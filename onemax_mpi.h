@@ -8,7 +8,7 @@
 #include "cga_param.h"
 #include "onemax.h"
 
-// Comunicación de individuos MPI
+// Comunicación de individuos MPI  mediante AllGather
 Individuo* MPI_Comunicacion(const Individuo* mejor, const unsigned num_ejecuciones);
 
 #endif

@@ -5,7 +5,7 @@
 #include "onemax.h"
 #include "onemax_mpi.h"
 
-//Variable para Izhikevich
+//Variables para Izhikevich
 float IniI, IncMutI, IncPosI, IncNegI, IncPicI;
 float IniA;
 float IniB, IncPosB, IncNegB, IncPicB;
@@ -24,6 +24,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    //Asignación de variables de entrada
     unsigned int seed = (unsigned int) strtoul(argv[1], NULL, 10);
 
     int idx = 2;
@@ -53,6 +54,7 @@ int main(int argc, char *argv[]) {
     MAX_ULT_PICO = atoi(argv[idx++]);
     MAX_PIC_SEG  = atoi(argv[idx++]);
 
+    //Declaración de variables
     Individuo **poblacion, **nueva_poblacion;
     Individuo hijo, mejor_individuo;
     Individuo *p1, *p2;
@@ -72,12 +74,14 @@ int main(int argc, char *argv[]) {
 
     int myrank, size;
 
+    //Programa principal
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
     srand(seed + myrank);
 
+    //Creación de población inicial
     poblacion = (Individuo**) calloc(N_ROWS, sizeof(Individuo*));
     nueva_poblacion = (Individuo**) calloc(N_ROWS, sizeof(Individuo*));
     if(!poblacion || !nueva_poblacion)
@@ -96,7 +100,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // Inicializar población
+    //Inicializar población
     for (i = 0; i < N_ROWS; i++)
         for (j = 0; j < N_COLS; j++)
         {
@@ -118,22 +122,25 @@ int main(int argc, char *argv[]) {
             for (j = 0; j < N_COLS; j++) 
             {
 
-                // Selección de dos padres vecinos
+                //Selección de dos padres vecinos
                 vecino_aleatorios(i, j, fc);
                 p1 = &poblacion[fc[0]][fc[1]];
                 p2 = &poblacion[fc[2]][fc[3]];
 
-                // Crossover + mutación
+                //Crossover + mutación
                 crossover_1p(p1, p2, &hijo);
                 hay_mutacion = mutar(&hijo);
 
+                //Izhikevich: si hay mutacion cambia la I
                 if(hay_mutacion)
                 {
                     I += IncMutI;
                 }
 
+                //Obtenemos el fitness del hijo
                 hijo.fitness = evaluar(&hijo);
 
+                //Izhikevich: Si la diferencia de fitness es menor que el umbral inferior cambio en las variables
                 if(hijo.fitness - poblacion[i][j].fitness < umbral_f_bajo)
                 {
                     I += IncPosI;
@@ -142,6 +149,7 @@ int main(int argc, char *argv[]) {
                     d += IncPosD;
                 }
 
+                //Izhikevich: Si la diferencia de fitness es mayor que el umbral superior cambio en las variables
                 if(hijo.fitness - poblacion[i][j].fitness > umbral_f_alto)
                 {
                     I += IncNegI;
@@ -150,11 +158,12 @@ int main(int argc, char *argv[]) {
                     d += IncNegD;
                 }
 
+                //Limitamos los parámetros para evitar errores
                 Izhikevich_limitar_parametros(&b, &c, &d, &I);
-
 
                 hay_pico = Izhikevich(&v, &u, a, b, c, d, I);
 
+                //Llevamos la cuenta del nº de picos
                 if(hay_pico)
                 {
                     //printf("Ha habido pico\n");
@@ -175,6 +184,7 @@ int main(int argc, char *argv[]) {
                     }
                 }
 
+                //Izhikevich: si hay muchos picos seguidos se cambian las variables
                 if(picos_seguidos > MAX_PIC_SEG)
                 {
                     I += IncPicI;
@@ -185,13 +195,13 @@ int main(int argc, char *argv[]) {
                 }
 
                 Izhikevich_limitar_parametros(&b, &c, &d, &I);
-                // Fuga dependiente del nivel de excitación
+                //Fuga dependiente del nivel de excitación
                 if (picos_seguidos > 5)
                     I *= 0.9f;
                 else
                     I *= 0.98f;
 
-                // Reemplazo elitista
+                //Reemplazo con Izhikevich
                 if(hay_pico || mejor_fitness_f(hijo.fitness, poblacion[i][j].fitness))
                 {
                     copiar(&nueva_poblacion[i][j], &hijo);
@@ -225,6 +235,7 @@ int main(int argc, char *argv[]) {
             free(mejores);
         }
 
+        //Llevamos la cuenta del mejor, peor y promedio de fitness
         if(myrank == 0)
         {
             mejor_fitness = suma_fitness = 0;
@@ -246,7 +257,7 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        // Copiar nueva población a actual
+        //Copiar nueva población a actual
         for (int i = 0; i < N_ROWS; i++)
             for (int j = 0; j < N_COLS; j++)
                 copiar(&poblacion[i][j], &nueva_poblacion[i][j]);
@@ -265,6 +276,7 @@ int main(int argc, char *argv[]) {
         printf("Mejor fitness encontrado: %d\nMejor fitness posible: %d\n", mejor_fitness_global, L);
     }
 
+    //Liberamos la memoria
     for(i = 0; i < N_ROWS; ++i)
     {
         free(poblacion[i]);

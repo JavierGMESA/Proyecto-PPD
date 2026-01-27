@@ -16,8 +16,10 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    //Asignación de variables de entrada
     unsigned int seed = (unsigned int) strtoul(argv[1], NULL, 10);
 
+    //Declaración de variables
     Individuo **poblacion, **nueva_poblacion;
     int i, j;
     int fc[4];
@@ -31,14 +33,14 @@ int main(int argc, char *argv[])
 
     int myrank, size;
 
+    //Programa principal
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
     srand(seed + myrank);
 
-    //poblacion = (Individuo**) calloc(N_ROWS, sizeof(Individuo*));
-    //nueva_poblacion = (Individuo**) calloc(N_ROWS, sizeof(Individuo*));
+    //Creación de población inicial
     poblacion = new Individuo*[N_ROWS];
     nueva_poblacion = new Individuo*[N_ROWS];
     if(!poblacion || !nueva_poblacion)
@@ -49,8 +51,6 @@ int main(int argc, char *argv[])
     
     for(i = 0; i < N_ROWS; ++i)
     {
-        //poblacion[i] = (Individuo*) calloc (N_COLS, sizeof(Individuo));
-        //nueva_poblacion[i] = (Individuo*) calloc (N_COLS, sizeof(Individuo));
         poblacion[i] = new Individuo[N_COLS];
         nueva_poblacion[i] = new Individuo[N_COLS];
         if(!poblacion[i] || !nueva_poblacion[i])
@@ -60,7 +60,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    // Inicializar población
+    //Inicializar población
     for (i = 0; i < N_ROWS; i++)
         for (j = 0; j < N_COLS; j++)
         {
@@ -73,23 +73,25 @@ int main(int argc, char *argv[])
         }
             
 
-    // Bucle principal
+    //Bucle principal
     for (int gen = 0; gen < GEN_MAX; gen++) {
         for (i = 0; i < N_ROWS; i++) {
             for (int j = 0; j < N_COLS; j++) {
 
-                // Selección de dos padres vecinos
+                //Selección de dos padres vecinos
                 vecino_aleatorios(i, j, fc);
 
                 p1 = &poblacion[fc[0]][fc[1]];
                 p2 = &poblacion[fc[2]][fc[3]];
 
-                // Crossover + mutación
+                //Crossover + mutación
                 crossover_1p(p1, p2, &hijo);
                 mutar(&hijo);
+
+                //Obtenemos el fitness del hijo
                 hijo.fitness = evaluar(&hijo);
 
-                    // Reemplazo elitista
+                //Reemplazo elitista
                 if (mejor_fitness_f(hijo.fitness, poblacion[i][j].fitness))
                 {
                     copiar(&nueva_poblacion[i][j], &hijo);
@@ -123,6 +125,7 @@ int main(int argc, char *argv[])
             delete[] mejores;
         }
 
+        //Llevamos la cuenta del mejor, peor y promedio de fitness, kms verdes y CO2
         if(myrank == 0)
         {
             mejor_green_kms = suma_green_kms = 0.0;
@@ -168,7 +171,7 @@ int main(int argc, char *argv[])
             }
         }
 
-        // Copiar nueva población a actual
+        //Copiar nueva población a actual
         for (int i = 0; i < N_ROWS; i++)
             for (int j = 0; j < N_COLS; j++)
                 copiar(&poblacion[i][j], &nueva_poblacion[i][j]);
@@ -184,20 +187,17 @@ int main(int argc, char *argv[])
 
     if(myrank == 0)
     {
-        // Resultado final
+        //Resultado final
         printf("\n=== RESULTADO FINAL ===\n");
         printf("Mejor fitness encontrado: %f\nMejor fitness posible: %f\n", mejor_fitness_global, 2.0);
     }
 
+    //Liberamos la memoria
     for(i = 0; i < N_ROWS; ++i)
     {
-        //free(poblacion[i]);
-        //free(nueva_poblacion[i]);
         delete[] poblacion[i];
         delete[] nueva_poblacion[i];
     }
-    //free(poblacion);
-    //free(nueva_poblacion);
     delete[] poblacion;
     delete[] nueva_poblacion;
 

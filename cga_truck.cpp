@@ -8,29 +8,42 @@
 
 int main(int argc, char *argv[]) {
 
-    if(argc < 2)                                                //CAMBIO
+    if(argc < 2)
     {
         printf("Uso: %s seed \n", argv[0]);
         printf("El número de parámetros pasados ha sido: %i", argc);
         return 1;
     }
 
+    //Asignación de variables de entrada
     unsigned int seed = (unsigned int) strtoul(argv[1], NULL, 10);
+
+    //Declaración de variables
+    Individuo **poblacion, **nueva_poblacion;
+    Individuo hijo, mejor_individuo;
+    double mejor_fitness_global = 0;
+
+    double mejor_fitness, peor_fitness, suma_fitness;
+    double mejor_green_kms, peor_green_kms, suma_green_kms;
+    double mejor_emissions, peor_emissions, suma_emissions;
+    int i, j;
+
+    //Programa principal
     srand(seed);
 
-    Individuo **poblacion, **nueva_poblacion;
+    //Creación de población inicial
     poblacion = new Individuo*[N_ROWS];
-    nueva_poblacion = new Individuo*[N_ROWS];                   //CAMBIO
+    nueva_poblacion = new Individuo*[N_ROWS];
     if(!poblacion || !nueva_poblacion)
     {
         printf("Ha habido error en la reserva de memoria");
         return 1;
     }
-    int i, j;
+    
     for(i = 0; i < N_ROWS; ++i)
     {
         poblacion[i] = new Individuo[N_COLS];
-        nueva_poblacion[i] = new Individuo[N_COLS];             //CAMBIO
+        nueva_poblacion[i] = new Individuo[N_COLS];
         if(!poblacion[i] || !nueva_poblacion[i])
         {
             printf("Ha habido error en la reserva de memoria");
@@ -38,15 +51,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    //CAMBIO
-    Individuo hijo, mejor_individuo;
-    double mejor_fitness_global = 0;
-
-    double mejor_fitness, peor_fitness, suma_fitness;
-    double mejor_green_kms, peor_green_kms, suma_green_kms;
-    double mejor_emissions, peor_emissions, suma_emissions;
-
-    // Inicializar población
+    //Inicializar población
     for (i = 0; i < N_ROWS; i++)
         for (j = 0; j < N_COLS; j++)
         {
@@ -59,24 +64,29 @@ int main(int argc, char *argv[]) {
         }
             
 
-    // Bucle principal
-    for (int gen = 0; gen < GEN_MAX; gen++) {
-        for (i = 0; i < N_ROWS; i++) {
-            for (j = 0; j < N_COLS; j++) {
+    //Bucle principal
+    for (int gen = 0; gen < GEN_MAX; gen++) 
+    {
+        for (i = 0; i < N_ROWS; i++) 
+        {
+            for (j = 0; j < N_COLS; j++) 
+            {
 
-                // Selección de dos padres vecinos
+                //Selección de dos padres vecinos
                 int fc[4];
                 vecino_aleatorios(i, j, fc);
 
                 Individuo *p1 = &poblacion[fc[0]][fc[1]];
                 Individuo *p2 = &poblacion[fc[2]][fc[3]];
 
-                // Crossover + mutación
+                //Crossover + mutación
                 crossover_1p(p1, p2, &hijo);
                 mutar(&hijo);
+
+                //Obtenemos el fitness del hijo
                 hijo.fitness = evaluar(&hijo);
 
-                // Reemplazo elitista
+                //Reemplazo elitista
                 if (mejor_fitness_f(hijo.fitness, poblacion[i][j].fitness))
                 {
                     copiar(&nueva_poblacion[i][j], &hijo);
@@ -91,6 +101,7 @@ int main(int argc, char *argv[]) {
             }
         }
 
+        //Llevamos la cuenta del mejor, peor y promedio de fitness, kms verdes y CO2
         mejor_green_kms = suma_green_kms = 0.0;
         peor_green_kms = MAX_GREEN_KMS;
         mejor_emissions = MAX_TOTAL_EMISIONS;
@@ -133,29 +144,29 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        // Copiar nueva población a actual
+        //Copiar nueva población a actual
         for (int i = 0; i < N_ROWS; i++)
             for (int j = 0; j < N_COLS; j++)
                 copiar(&poblacion[i][j], &nueva_poblacion[i][j]);
 
-        //CAMBIO
         printf("Generación %d\nMejor fitness global: %.6f\n", gen, mejor_fitness_global);
         printf("Mejor fitness: %.6f | Peor fitness: %.6f | Promedio de fitness: %.6f\n", mejor_fitness, peor_fitness, suma_fitness / (N_ROWS*N_COLS));
         printf("Mejor green kms: %.6f | Peor green kms: %.6f | Promedio de green kms: %.6f\n", mejor_green_kms, peor_green_kms, suma_green_kms / (N_ROWS*N_COLS));
         printf("Mejor emissions: %.6f | Peor emissions: %.6f | Promedio de emissions: %.6f\n", mejor_emissions, peor_emissions, suma_emissions / (N_ROWS*N_COLS));
     }
 
-    // Resultado final
+    //Resultado final
     printf("\n=== RESULTADO FINAL ===\n");
     printf("Mejor fitness encontrado: %.6f\nMejor fitness posible: %.6f\n", mejor_fitness_global, 2.0);     //CAMBIO
 
+    //Liberamos la memoria
     for(i = 0; i < N_ROWS; ++i)
     {
         delete[] poblacion[i];
-        delete[] nueva_poblacion[i];                //CAMBIO
+        delete[] nueva_poblacion[i];
     }
     delete[] poblacion;
-    delete[] nueva_poblacion;                       //CAMBIO
+    delete[] nueva_poblacion;
 
     destroy_truck_evaluator();
 

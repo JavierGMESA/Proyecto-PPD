@@ -6,18 +6,29 @@
 
 // ------------------ PROGRAMA PRINCIPAL ------------------
 
-int main(int argc, char *argv[]) {
-    if(argc < 2)                                                //CAMBIO
+int main(int argc, char *argv[]) 
+{
+    if(argc < 2)
     {
         printf("Uso: %s seed \n", argv[0]);
         printf("El número de parámetros pasados ha sido: %i", argc);
         return 1;
     }
 
+    //Asignación de variables de entrada
     unsigned int seed = (unsigned int) strtoul(argv[1], NULL, 10);
+
+    //Declaración de variables
+    Individuo **poblacion, **nueva_poblacion;
+    Individuo hijo, mejor_individuo;
+    int mejor_fitness_global = 0;
+    int mejor_fitness, peor_fitness, suma_fitness;
+    int i, j;
+
+    //Programa principal
     srand(seed);
 
-    Individuo **poblacion, **nueva_poblacion;
+    //Creación de población inicial
     poblacion = (Individuo**) calloc(N_ROWS, sizeof(Individuo*));
     nueva_poblacion = (Individuo**) calloc(N_ROWS, sizeof(Individuo*));
     if(!poblacion || !nueva_poblacion)
@@ -25,7 +36,7 @@ int main(int argc, char *argv[]) {
         printf("Ha habido error en la reserva de memoria");
         return 1;
     }
-    int i, j;
+
     for(i = 0; i < N_ROWS; ++i)
     {
         poblacion[i] = (Individuo*) calloc (N_COLS, sizeof(Individuo));
@@ -37,13 +48,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    Individuo hijo, mejor_individuo;
-    int mejor_fitness_global = 0;
-
-    //CAMBIO
-    int mejor_fitness, peor_fitness, suma_fitness;
-
-    // Inicializar población
+    //Inicializar población
     for (i = 0; i < N_ROWS; i++)
         for (j = 0; j < N_COLS; j++)
         {
@@ -56,24 +61,25 @@ int main(int argc, char *argv[]) {
         }
             
 
-    // Bucle principal
+    //Bucle principal
     for (int gen = 0; gen < GEN_MAX; gen++) {
         for (i = 0; i < N_ROWS; i++) {
             for (j = 0; j < N_COLS; j++) {
 
-                // Selección de dos padres vecinos
+                //Selección de dos padres vecinos
                 int fc[4];
                 vecino_aleatorios(i, j, fc);
-
                 Individuo *p1 = &poblacion[fc[0]][fc[1]];
                 Individuo *p2 = &poblacion[fc[2]][fc[3]];
 
-                // Crossover + mutación
+                //Crossover + mutación
                 crossover_1p(p1, p2, &hijo);
                 mutar(&hijo);
+
+                //Izhikevich: si hay mutacion cambia la I
                 hijo.fitness = evaluar(&hijo);
 
-                // Reemplazo elitista
+                //Reemplazo elitista
                 if (mejor_fitness_f(hijo.fitness, poblacion[i][j].fitness))
                 {
                     copiar(&nueva_poblacion[i][j], &hijo);
@@ -88,7 +94,7 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        //CAMBIO
+        //Llevamos la cuenta del mejor, peor y promedio de fitness
         mejor_fitness = suma_fitness = 0;
         peor_fitness = L;
         for(i = 0; i < N_ROWS; ++i)
@@ -107,20 +113,20 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        // Copiar nueva población a actual
+        //Copiar nueva población a actual
         for (int i = 0; i < N_ROWS; i++)
             for (int j = 0; j < N_COLS; j++)
                 copiar(&poblacion[i][j], &nueva_poblacion[i][j]);
 
-        //CAMBIO
         printf("Generación %d\nMejor fitness global: %d\n", gen, mejor_fitness_global);
         printf("Mejor fitness: %d | Peor fitness: %d | Promedio de fitness: %d\n", mejor_fitness, peor_fitness, suma_fitness / (N_ROWS*N_COLS));
     }
 
-    // Resultado final
+    //Resultado final
     printf("\n=== RESULTADO FINAL ===\n");
     printf("Mejor fitness encontrado: %d\nMejor fitness posible: %d\n", mejor_fitness_global, L);
 
+    //Liberamos la memoria
     for(i = 0; i < N_ROWS; ++i)
     {
         free(poblacion[i]);
